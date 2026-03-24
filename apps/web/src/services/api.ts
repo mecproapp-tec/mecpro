@@ -1,14 +1,8 @@
 import axios from "axios";
 
-// ==========================
-// 🌍 BASE URL (COM /api)
-// ==========================
 const API_URL = import.meta.env.VITE_API_URL || "http://mecpro.tec.br:3000/api";
 console.log('🔧 API_URL carregada:', API_URL);
 
-// ==========================
-// 🚀 INSTÂNCIA AXIOS
-// ==========================
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -18,9 +12,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// ==========================
-// 🔐 REQUEST INTERCEPTOR (TOKEN)
-// ==========================
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
@@ -29,9 +20,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ==========================
-// ❌ RESPONSE INTERCEPTOR (ERROS)
-// ==========================
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -51,9 +39,6 @@ api.interceptors.response.use(
   }
 );
 
-// ==========================
-// 🔐 AUTH
-// ==========================
 export const login = async (data: { email: string; password: string }) => {
   const response = await api.post("/auth/login", data);
   return response.data;
@@ -70,15 +55,12 @@ export const registerTenant = async (data: {
   ownerName: string;
   password: string;
   paymentCompleted: boolean;
-  pendingId?: string; // Adicionado para suporte ao fluxo de pagamento
+  preapprovalId?: string; // <- alterado de pendingId para preapprovalId
 }) => {
   const response = await api.post("/auth/register-tenant", data);
   return response.data;
 };
 
-// ==========================
-// 💬 WHATSAPP
-// ==========================
 export const sendWhatsApp = async (tipo: "invoice" | "estimate", id: number) => {
   const response = await api.post(`/${tipo}s/${id}/send-whatsapp`);
   return response.data;

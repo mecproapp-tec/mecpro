@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { registerTenant } from "../../../services/api";
-import api from "../../../services/api";
+
+const MP_CHECKOUT_URL = `https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=${import.meta.env.VITE_MP_PLAN_ID}`;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -21,14 +22,19 @@ export default function Register() {
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [loading, setLoading] = useState(false);
   const [paymentStarted, setPaymentStarted] = useState(false);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [preapprovalId, setPreapprovalId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get("payment") === "success") {
+    const paymentStatus = params.get("payment");
+    const preapproval = params.get("preapproval_id");
+
+    if (paymentStatus === "success" && preapproval) {
       setMessage({ text: "Pagamento autorizado! Agora finalize seu cadastro.", type: "success" });
       setPaymentStarted(true);
+      setPreapprovalId(preapproval);
 
+      // Recupera dados salvos no localStorage
       const saved = localStorage.getItem("pendingRegistration");
       if (saved) {
         const data = JSON.parse(saved);
@@ -46,8 +52,11 @@ export default function Register() {
         setTelefone(data.phone);
         setOwnerName(data.ownerName);
       }
-      const savedPendingId = localStorage.getItem("pendingId");
-      if (savedPendingId) setPendingId(savedPendingId);
+    } else if (paymentStatus === "failure") {
+      setMessage({ text: "Pagamento recusado. Tente novamente.", type: "error" });
+      localStorage.removeItem("pendingRegistration");
+    } else if (paymentStatus === "pending") {
+      setMessage({ text: "Pagamento pendente. Aguarde confirmação.", type: "error" });
     }
   }, [location]);
 
@@ -91,47 +100,35 @@ export default function Register() {
     setTelefone(value);
   };
 
-  const handlePayment = async () => {
+  const handlePayment = () => {
     if (!form.email) {
       setMessage({ text: "Preencha o e-mail antes de prosseguir.", type: "error" });
       return;
     }
 
-    setLoading(true);
-    try {
-      const formData = {
-        officeName: form.officeName,
-        documentType: tipoDocumento,
-        documentNumber: numeroDocumento,
-        cep: cep,
-        address: endereco,
-        number: numero,
-        complement: complemento,
-        email: form.email,
-        phone: telefone,
-        ownerName: ownerName,
-        password: form.password,
-      };
-      localStorage.setItem("pendingRegistration", JSON.stringify(formData));
+    // Salva dados do formulário no localStorage
+    const formData = {
+      officeName: form.officeName,
+      documentType: tipoDocumento,
+      documentNumber: numeroDocumento,
+      cep: cep,
+      address: endereco,
+      number: numero,
+      complement: complemento,
+      email: form.email,
+      phone: telefone,
+      ownerName: ownerName,
+      password: form.password,
+    };
+    localStorage.setItem("pendingRegistration", JSON.stringify(formData));
 
-      const response = await api.post("/payments/create-pending", { email: form.email });
-      const { checkoutUrl, pendingId: newPendingId } = response.data;
-      setPendingId(newPendingId);
-      localStorage.setItem("pendingId", newPendingId);
-
-      setPaymentStarted(true);
-      window.location.href = checkoutUrl;
-    } catch (error) {
-      console.error(error);
-      setMessage({ text: "Erro ao iniciar pagamento.", type: "error" });
-    } finally {
-      setLoading(false);
-    }
+    // Redireciona diretamente para o Mercado Pago
+    window.location.href = MP_CHECKOUT_URL;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentStarted) {
+    if (!paymentStarted || !preapprovalId) {
       setMessage({ text: "Você precisa concluir o pagamento antes de cadastrar.", type: "error" });
       return;
     }
@@ -152,7 +149,7 @@ export default function Register() {
       ownerName: ownerName,
       password: form.password,
       paymentCompleted: true,
-      pendingId: pendingId,
+      preapprovalId, // enviamos o ID da assinatura
     };
 
     try {
@@ -167,7 +164,6 @@ export default function Register() {
       });
 
       localStorage.removeItem("pendingRegistration");
-      localStorage.removeItem("pendingId");
 
       setTimeout(() => navigate("/home"), 1500);
     } catch (err: any) {
@@ -178,14 +174,13 @@ export default function Register() {
     }
   };
 
+  // Estilos inline (mantidos iguais)
   const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
     e.target.style.borderColor = "#00e5ff";
   };
-
   const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
     e.target.style.borderColor = "#333";
   };
-
   const inputStyle = {
     width: "100%",
     padding: "16px",
@@ -253,6 +248,7 @@ export default function Register() {
         )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Nome da Oficina */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               Nome da Oficina
@@ -270,6 +266,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Tipo de Documento */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               Tipo de Documento
@@ -293,6 +290,7 @@ export default function Register() {
             </select>
           </div>
 
+          {/* Número do Documento */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               {`Nº do documento (${tipoDocumento === "CPF" ? "11 dígitos" : "14 dígitos"})`}
@@ -309,6 +307,7 @@ export default function Register() {
             />
           </div>
 
+          {/* CEP */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               CEP (somente números)
@@ -325,6 +324,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Endereço (via CEP) */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               Endereço
@@ -341,6 +341,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Número e Complemento */}
           <div style={{ display: "flex", gap: "16px" }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
@@ -373,6 +374,7 @@ export default function Register() {
             </div>
           </div>
 
+          {/* E-mail */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               E-mail
@@ -391,6 +393,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Telefone */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               Telefone
@@ -407,6 +410,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Nome do Proprietário */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               Nome do Responsavel
@@ -423,6 +427,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Senha */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               Senha
@@ -441,6 +446,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Botão de pagamento */}
           {!paymentStarted && (
             <button
               type="button"
@@ -459,20 +465,13 @@ export default function Register() {
                 marginTop: "8px",
                 boxShadow: "0 8px 20px rgba(255, 0, 170, 0.3)",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.02)";
-                e.currentTarget.style.boxShadow = "0 12px 28px rgba(255, 0, 170, 0.5)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(255, 0, 170, 0.3)";
-              }}
               disabled={loading}
             >
               1º mês grátis / R$ 149,90
             </button>
           )}
 
+          {/* Botão de cadastro */}
           <button
             type="submit"
             disabled={loading || !paymentStarted}
@@ -490,18 +489,6 @@ export default function Register() {
               opacity: loading || !paymentStarted ? 0.6 : 1,
               cursor: loading || !paymentStarted ? "not-allowed" : "pointer",
               boxShadow: loading || !paymentStarted ? "none" : "0 8px 20px rgba(0, 229, 255, 0.3)",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading && paymentStarted) {
-                e.currentTarget.style.transform = "scale(1.02)";
-                e.currentTarget.style.boxShadow = "0 12px 28px rgba(0, 229, 255, 0.5)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading && paymentStarted) {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(0, 229, 255, 0.3)";
-              }
             }}
           >
             {loading ? "Cadastrando..." : "Cadastrar"}

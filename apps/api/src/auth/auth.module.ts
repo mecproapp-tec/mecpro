@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './guards/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt.guard';
 import { RolesGuard } from './roles.guard';
+import { PaymentModule } from '../payments/payment.module'; // adicionado
 
 @Module({
   imports: [
@@ -22,14 +23,10 @@ import { RolesGuard } from './roles.guard';
         signOptions: { expiresIn: '7d' },
       }),
     }),
+    PaymentModule, // adicionado
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    JwtAuthGuard,
-    RolesGuard,
-  ],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
   exports: [AuthService, JwtModule, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}
