@@ -1,11 +1,17 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';   
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Habilita CORS para as origens permitidas
   app.enableCors({
-    origin: 'https://mecpro.tec.br', 
+    origin: [
+      'https://mecpro.tec.br',
+      'https://www.mecpro.tec.br',
+      
+      // 'https://mec-pro.vercel.app
+    ],
     credentials: true,
   });
 
