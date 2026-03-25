@@ -44,6 +44,12 @@ export const login = async (data: { email: string; password: string }) => {
   return response.data;
 };
 
+export const logout = async () => {
+  await api.post("/auth/logout");
+  localStorage.removeItem("token");
+  window.location.href = "/login";
+};
+
 export const registerTenant = async (data: {
   officeName: string;
   documentType: string;
@@ -55,7 +61,7 @@ export const registerTenant = async (data: {
   ownerName: string;
   password: string;
   paymentCompleted: boolean;
-  preapprovalId?: string; // <- alterado de pendingId para preapprovalId
+  preapprovalId?: string;
 }) => {
   const response = await api.post("/auth/register-tenant", data);
   return response.data;
