@@ -12,7 +12,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Redireciona se já estiver logado
   useEffect(() => {
     if (user) {
       navigate("/home");
@@ -28,7 +27,6 @@ export default function Login() {
       await login(email, password);
       navigate("/home");
     } catch (err: any) {
-      // A mensagem de bloqueio vinda do backend será exibida diretamente
       const message =
         err.response?.data?.message ||
         "Erro ao fazer login. Verifique suas credenciais.";
@@ -185,7 +183,7 @@ export default function Login() {
               }}
             />
             <label htmlFor="remember" style={{ color: "#a0a0a0", cursor: "pointer" }}>
-              Remember
+              Lembrar
             </label>
           </div>
 

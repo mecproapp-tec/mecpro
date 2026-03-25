@@ -85,50 +85,49 @@ export default function Faturas() {
   };
 
   const handleWhatsApp = async (fatura: Invoice) => {
-    const cliente = clientes.find((c) => c.id === fatura.clientId);
+  const cliente = clientes.find((c) => c.id === fatura.clientId);
+  if (!cliente) {
+    alert("Cliente não encontrado");
+    return;
+  }
 
-    if (!cliente) {
-      alert("Cliente não encontrado");
-      return;
-    }
+  let telefone = cliente.phone.replace(/\D/g, "");
+  if (telefone.length === 10 || telefone.length === 11) {
+    telefone = "55" + telefone;
+  }
 
-    let telefone = cliente.phone.replace(/\D/g, "");
-    if (telefone.length === 10 || telefone.length === 11) {
-      telefone = "55" + telefone;
-    }
+  try {
+    const response = await api.post(`/invoices/${fatura.id}/share`);
+    const { url: link } = response.data;
 
-    try {
-      const response = await api.post(`/invoices/${fatura.id}/share`);
-      const { url: link } = response.data;
+    const clienteInfo = getClienteInfo(fatura.clientId);
 
-      const clienteInfo = getClienteInfo(fatura.clientId);
+    // Link isolado no início da mensagem
+    const mensagem = encodeURIComponent(
+      `${link}
 
-      const mensagem = encodeURIComponent(
-        `Olá ${cliente.name}!
+Olá ${cliente.name}!
 
-Sua fatura nº ${fatura.number} está disponível ✅
-
-📄 Acesse aqui:
-${link}
+Sua fatura ${fatura.number} está disponível ✅
 
 👤 Cliente: ${clienteInfo.nome}
 🚗 Veículo: ${clienteInfo.veiculo}
 💰 Total: R$ ${fatura.total.toFixed(2)}
 📌 Status: ${
-          fatura.status === "PAID"
-            ? "Paga"
-            : fatura.status === "PENDING"
-            ? "Pendente"
-            : "Cancelada"
-        }`
-      );
+        fatura.status === "PAID"
+          ? "Paga"
+          : fatura.status === "PENDING"
+          ? "Pendente"
+          : "Cancelada"
+      }`
+    );
 
-      window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
-    } catch (error) {
-      console.error("Erro ao gerar link da fatura:", error);
-      alert("Erro ao gerar link da fatura. Tente novamente.");
-    }
-  };
+    window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
+  } catch (error) {
+    console.error("Erro ao gerar link da fatura:", error);
+    alert("Erro ao gerar link da fatura. Tente novamente.");
+  }
+};
 
   const handlePDF = (fatura: Invoice) => {
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
@@ -182,7 +181,7 @@ ${link}
             }</p>
             <div class="details">
               <h3>Itens</h3>
-               <table>
+              <table>
                 <thead>
                   <tr>
                     <th>Descrição</th>

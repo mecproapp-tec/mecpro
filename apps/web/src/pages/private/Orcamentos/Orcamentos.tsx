@@ -168,44 +168,43 @@ export default function Orcamentos() {
   };
 
   const handleWhatsApp = async (orcamento: Estimate) => {
-    const cliente = clientes.find((c) => c.id === orcamento.clientId);
+  const cliente = clientes.find((c) => c.id === orcamento.clientId);
+  if (!cliente) {
+    alert("Cliente não encontrado");
+    return;
+  }
 
-    if (!cliente) {
-      alert("Cliente não encontrado");
-      return;
-    }
+  let telefone = cliente.phone.replace(/\D/g, "");
+  if (telefone.length === 10 || telefone.length === 11) {
+    telefone = "55" + telefone;
+  }
 
-    let telefone = cliente.phone.replace(/\D/g, "");
-    if (telefone.length === 10 || telefone.length === 11) {
-      telefone = "55" + telefone;
-    }
+  try {
+    const response = await api.post(`/estimates/${orcamento.id}/share`);
+    const { url: link } = response.data;
 
-    try {
-      const response = await api.post(`/estimates/${orcamento.id}/share`);
-      const { url: link } = response.data;
+    const clienteInfo = getClienteInfo(orcamento.clientId);
 
-      const clienteInfo = getClienteInfo(orcamento.clientId);
+    // Link isolado no início da mensagem
+    const mensagem = encodeURIComponent(
+      `${link}
 
-      const mensagem = encodeURIComponent(
-        `Olá ${cliente.name}!
+Olá ${cliente.name}!
 
 Seu orçamento está pronto ✅
-
-📄 Acesse aqui:
-${link}
 
 👤 Cliente: ${clienteInfo.nome}
 🚗 Veículo: ${clienteInfo.veiculo}
 💰 Total: R$ ${orcamento.total.toFixed(2)}
 📌 Status: ${getStatusLabel(orcamento.status)}`
-      );
+    );
 
-      window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
-    } catch (error) {
-      console.error("Erro ao gerar link do orçamento:", error);
-      alert("Erro ao gerar link do orçamento. Tente novamente.");
-    }
-  };
+    window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
+  } catch (error) {
+    console.error("Erro ao gerar link do orçamento:", error);
+    alert("Erro ao gerar link do orçamento. Tente novamente.");
+  }
+};
 
   const handlePDF = (orcamento: Estimate) => {
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
