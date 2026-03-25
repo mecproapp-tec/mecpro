@@ -1,4 +1,5 @@
-﻿import { Controller, Post, Body } from '@nestjs/common';
+﻿import { Controller, Post, Body, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -34,7 +35,14 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() body: LoginDto) {
-    return this.authService.login(body.email, body.password);
+  async login(@Body() body: LoginDto, @Req() req: Request) {
+    return this.authService.login(body.email, body.password, req);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Req() req: Request) {
+    const user = req.user as any;
+    return this.authService.logout(user.id, user.sessionToken);
   }
 }

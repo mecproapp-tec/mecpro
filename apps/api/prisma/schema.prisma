@@ -81,6 +81,7 @@ model User {
   id            Int            @id @default(autoincrement())
   clients       Client[]
   refreshTokens RefreshToken[]
+  sessions      UserSession[]
   tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([email])
@@ -169,6 +170,21 @@ model RefreshToken {
 
   @@index([userId])
   @@index([token])
+}
+
+/// ///////////////// SESSÕES ATIVAS DOS USUÁRIOS ////////////////////
+model UserSession {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  sessionToken  String    @unique
+  ipAddress     String?
+  userAgent     String?
+  lastActivity  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
 }
 
 /// ///////////////// AGENDAMENTOS ////////////////////
