@@ -8,7 +8,28 @@ export class SubscriptionsService {
   async getByTenantId(tenantId: string) {
     const subscription = await this.prisma.subscription.findFirst({
       where: { tenantId },
-      include: { payments: true },
+      select: {
+        id: true,
+        planName: true,
+        price: true,
+        status: true,
+        gateway: true,
+        gatewaySubscriptionId: true,
+        startDate: true,
+        endDate: true,
+        createdAt: true,
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            gatewayPaymentId: true,
+            paidAt: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
     });
     if (!subscription) {
       throw new NotFoundException('Assinatura não encontrada');
@@ -19,7 +40,37 @@ export class SubscriptionsService {
   async getById(id: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { id },
-      include: { payments: true, tenant: true },
+      select: {
+        id: true,
+        planName: true,
+        price: true,
+        status: true,
+        gateway: true,
+        gatewaySubscriptionId: true,
+        startDate: true,
+        endDate: true,
+        createdAt: true,
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            gatewayPaymentId: true,
+            paidAt: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            status: true,
+          },
+        },
+      },
     });
     if (!subscription) {
       throw new NotFoundException('Assinatura não encontrada');
@@ -46,6 +97,24 @@ export class SubscriptionsService {
         gatewaySubscriptionId: data.gatewaySubscriptionId,
         startDate: data.startDate,
         endDate: data.endDate,
+      },
+      select: {
+        id: true,
+        planName: true,
+        price: true,
+        status: true,
+        gateway: true,
+        gatewaySubscriptionId: true,
+        startDate: true,
+        endDate: true,
+        createdAt: true,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
   }

@@ -72,7 +72,36 @@ export class InvoicesService {
   async findAll(tenantId: string) {
     return this.prisma.invoice.findMany({
       where: { tenantId },
-      include: { items: true, client: true },
+      select: {
+        id: true,
+        number: true,
+        total: true,
+        status: true,
+        pdfUrl: true,
+        pdfStatus: true,
+        createdAt: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            vehicle: true,
+            plate: true,
+            address: true,
+            document: true,
+          },
+        },
+        items: {
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            price: true,
+            total: true,
+            issPercent: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -80,9 +109,40 @@ export class InvoicesService {
   async findOne(id: number, tenantId: string) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, tenantId },
-      include: { items: true, client: true },
+      select: {
+        id: true,
+        number: true,
+        total: true,
+        status: true,
+        pdfUrl: true,
+        pdfStatus: true,
+        pdfGeneratedAt: true,
+        createdAt: true,
+        shareToken: true,
+        shareTokenExpires: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            vehicle: true,
+            plate: true,
+            address: true,
+            document: true,
+          },
+        },
+        items: {
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            price: true,
+            total: true,
+            issPercent: true,
+          },
+        },
+      },
     });
-
     if (!invoice) throw new NotFoundException('Fatura não encontrada');
     return invoice;
   }
@@ -175,9 +235,38 @@ export class InvoicesService {
   async validateShareToken(token: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { shareToken: token },
-      include: { items: true, client: true },
+      select: {
+        id: true,
+        tenantId: true,
+        number: true,
+        total: true,
+        status: true,
+        pdfUrl: true,
+        pdfStatus: true,
+        shareTokenExpires: true,
+        createdAt: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            vehicle: true,
+            plate: true,
+            address: true,
+            document: true,
+          },
+        },
+        items: {
+          select: {
+            description: true,
+            quantity: true,
+            price: true,
+            total: true,
+            issPercent: true,
+          },
+        },
+      },
     });
-
     if (!invoice) {
       throw new UnauthorizedException('Token inválido');
     }
@@ -191,6 +280,13 @@ export class InvoicesService {
     const invoice = await this.validateShareToken(token);
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: invoice.tenantId },
+      select: {
+        name: true,
+        documentNumber: true,
+        phone: true,
+        email: true,
+        logoUrl: true,
+      },
     });
 
     if (invoice.pdfUrl && invoice.pdfStatus === 'generated') {

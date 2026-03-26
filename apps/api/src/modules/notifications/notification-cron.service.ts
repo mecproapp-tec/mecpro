@@ -1,4 +1,3 @@
-// src/modules/notifications/notification-cron.service.ts
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../shared/prisma/prisma.service';

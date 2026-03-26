@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service'; // caminho corrigido
+import { PrismaService } from '../../shared/prisma/prisma.service';
 import { Client } from '@prisma/client';
 
 @Injectable()
@@ -23,16 +23,38 @@ export class ClientsService {
     });
   }
 
-  async findAll(tenantId: string): Promise<Client[]> {
+  async findAll(tenantId: string): Promise<Partial<Client>[]> {
     return this.prisma.client.findMany({
       where: { tenantId },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        vehicle: true,
+        plate: true,
+        address: true,
+        document: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: number, tenantId: string): Promise<Client> {
+  async findOne(id: number, tenantId: string): Promise<Partial<Client>> {
     const client = await this.prisma.client.findFirst({
       where: { id, tenantId },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        vehicle: true,
+        plate: true,
+        address: true,
+        document: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     if (!client) {
       throw new NotFoundException('Cliente não encontrado');

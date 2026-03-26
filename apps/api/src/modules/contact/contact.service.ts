@@ -31,8 +31,25 @@ export class ContactService {
   async findAll() {
     try {
       return await this.prisma.contactMessage.findMany({
+        select: {
+          id: true,
+          userEmail: true,
+          userName: true,
+          message: true,
+          status: true,
+          reply: true,
+          createdAt: true,
+          updatedAt: true,
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
         orderBy: { createdAt: 'desc' },
-        include: { tenant: true },
       });
     } catch (error) {
       this.logger.error(`Erro ao listar mensagens: ${error.message}`);
@@ -44,7 +61,24 @@ export class ContactService {
     try {
       const message = await this.prisma.contactMessage.findUnique({
         where: { id },
-        include: { tenant: true },
+        select: {
+          id: true,
+          userEmail: true,
+          userName: true,
+          message: true,
+          status: true,
+          reply: true,
+          createdAt: true,
+          updatedAt: true,
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
       });
       if (!message) throw new NotFoundException('Mensagem não encontrada');
       return message;
@@ -58,19 +92,30 @@ export class ContactService {
     try {
       const message = await this.prisma.contactMessage.findUnique({
         where: { id },
-        include: { tenant: true },
+        select: { tenantId: true },
       });
       if (!message) throw new NotFoundException('Mensagem não encontrada');
 
       this.logger.log(`Respondendo mensagem ${id} - tenantId: ${message.tenantId}`);
 
-      // Atualiza a mensagem
       const updatedMessage = await this.prisma.contactMessage.update({
         where: { id },
         data: { reply, status: 'replied' },
+        select: {
+          id: true,
+          userEmail: true,
+          userName: true,
+          message: true,
+          status: true,
+          reply: true,
+          createdAt: true,
+          updatedAt: true,
+          tenant: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
+        },
       });
 
-      // Cria a notificação se houver tenant
       if (message.tenantId) {
         try {
           await this.notificationsService.create(
@@ -81,7 +126,6 @@ export class ContactService {
           this.logger.log(`Notificação criada com sucesso para tenant ${message.tenantId}`);
         } catch (notifError) {
           this.logger.error(`Falha ao criar notificação para tenant ${message.tenantId}: ${notifError.message}`);
-          // Não interrompe a resposta, apenas registra o erro
         }
       } else {
         this.logger.warn(`Mensagem ${id} não possui tenantId, notificação não criada`);

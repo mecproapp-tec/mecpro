@@ -69,7 +69,37 @@ export class EstimatesService {
   async findAll(tenantId: string) {
     return this.prisma.estimate.findMany({
       where: { tenantId },
-      include: { items: true, client: true },
+      select: {
+        id: true,
+        date: true,
+        total: true,
+        status: true,
+        pdfUrl: true,
+        pdfStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            vehicle: true,
+            plate: true,
+            address: true,
+            document: true,
+          },
+        },
+        items: {
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            price: true,
+            total: true,
+            issPercent: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -77,7 +107,40 @@ export class EstimatesService {
   async findOne(id: number, tenantId: string) {
     const estimate = await this.prisma.estimate.findFirst({
       where: { id, tenantId },
-      include: { items: true, client: true },
+      select: {
+        id: true,
+        date: true,
+        total: true,
+        status: true,
+        pdfUrl: true,
+        pdfStatus: true,
+        pdfGeneratedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        shareToken: true,
+        shareTokenExpires: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            vehicle: true,
+            plate: true,
+            address: true,
+            document: true,
+          },
+        },
+        items: {
+          select: {
+            id: true,
+            description: true,
+            quantity: true,
+            price: true,
+            total: true,
+            issPercent: true,
+          },
+        },
+      },
     });
     if (!estimate) throw new NotFoundException('Orçamento não encontrado');
     return estimate;
@@ -157,7 +220,34 @@ export class EstimatesService {
   async validateShareToken(token: string) {
     const estimate = await this.prisma.estimate.findFirst({
       where: { shareToken: token },
-      include: { items: true, client: true },
+      select: {
+        id: true,
+        tenantId: true,
+        date: true,
+        total: true,
+        status: true,
+        shareTokenExpires: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            vehicle: true,
+            plate: true,
+            address: true,
+            document: true,
+          },
+        },
+        items: {
+          select: {
+            description: true,
+            quantity: true,
+            price: true,
+            total: true,
+            issPercent: true,
+          },
+        },
+      },
     });
     if (!estimate) {
       throw new UnauthorizedException('Token inválido');
@@ -172,6 +262,13 @@ export class EstimatesService {
     const estimate = await this.validateShareToken(token);
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: estimate.tenantId },
+      select: {
+        name: true,
+        documentNumber: true,
+        phone: true,
+        email: true,
+        logoUrl: true,
+      },
     });
     try {
       const pdf = await this.estimatesPdfService.generateEstimatePdf(estimate, tenant);
@@ -205,7 +302,6 @@ export class EstimatesService {
       return { whatsappLink, message, pdfUrl };
     }
 
-    // Prepare data for PDF job
     const tenant = estimate.tenant;
     const effectiveTenant = workshopData
       ? {

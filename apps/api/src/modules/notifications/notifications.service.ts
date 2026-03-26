@@ -11,6 +11,15 @@ export class NotificationsService {
     try {
       return await this.prisma.notification.findMany({
         where: { tenantId },
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          read: true,
+          isGlobal: true,
+          createdAt: true,
+          appointmentId: true,
+        },
         orderBy: { createdAt: 'desc' },
       });
     } catch (error) {
@@ -23,11 +32,21 @@ export class NotificationsService {
     try {
       const notification = await this.prisma.notification.findFirst({
         where: { id, tenantId },
+        select: { id: true },
       });
       if (!notification) throw new NotFoundException('Notificação não encontrada');
       return await this.prisma.notification.update({
         where: { id },
         data: { read: true },
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          read: true,
+          isGlobal: true,
+          createdAt: true,
+          appointmentId: true,
+        },
       });
     } catch (error) {
       this.logger.error(`Erro ao marcar notificação ${id} como lida: ${error.message}`);
@@ -57,6 +76,15 @@ export class NotificationsService {
           message,
           read: false,
           isGlobal: false,
+        },
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          read: true,
+          isGlobal: true,
+          createdAt: true,
+          appointmentId: true,
         },
       });
       this.logger.log(`Notificação criada com ID ${notification.id}`);

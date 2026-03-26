@@ -8,9 +8,43 @@ export class TenantsService {
   async getById(id: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id },
-      include: {
-        users: true,
-        subscriptions: true,
+      select: {
+        id: true,
+        name: true,
+        documentType: true,
+        documentNumber: true,
+        cep: true,
+        address: true,
+        email: true,
+        phone: true,
+        logoUrl: true,
+        status: true,
+        trialEndsAt: true,
+        createdAt: true,
+        updatedAt: true,
+        paymentStatus: true,
+        subscriptionId: true,
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+        subscriptions: {
+          select: {
+            id: true,
+            planName: true,
+            price: true,
+            status: true,
+            startDate: true,
+            endDate: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!tenant) {
@@ -23,12 +57,28 @@ export class TenantsService {
     return this.prisma.tenant.update({
       where: { id },
       data,
+      select: {
+        id: true,
+        name: true,
+        documentNumber: true,
+        email: true,
+        phone: true,
+        logoUrl: true,
+        updatedAt: true,
+      },
     });
   }
 
   async findBySubscriptionId(subscriptionId: string) {
     return this.prisma.tenant.findFirst({
       where: { subscriptionId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        status: true,
+      },
     });
   }
 }
