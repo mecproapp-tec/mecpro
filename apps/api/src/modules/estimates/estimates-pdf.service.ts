@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as puppeteer from 'puppeteer';
 import * as Handlebars from 'handlebars';
 import * as path from 'path';
@@ -6,7 +6,14 @@ import * as fs from 'fs/promises';
 
 @Injectable()
 export class EstimatesPdfService {
+  private readonly logger = new Logger(EstimatesPdfService.name);
+
   async generateEstimatePdf(estimate: any, tenant: any): Promise<Buffer> {
+    this.logger.log(`Gerando PDF para orçamento ${estimate.id}, tenant: ${tenant?.id}`);
+
+    // Log para verificar se o tenant tem logo
+    this.logger.debug(`Logo URL: ${tenant?.logoUrl || 'não definido'}`);
+
     const items = estimate.items.map(item => ({
       description: item.description,
       quantity: item.quantity,
@@ -69,6 +76,8 @@ export class EstimatesPdfService {
       companyPhone,
       companyEmail,
     });
+
+    this.logger.debug(`HTML gerado, tamanho: ${html.length} caracteres`);
 
     const browser = await puppeteer.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
