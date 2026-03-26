@@ -12,9 +12,8 @@ import {
 } from "react-icons/fi";
 import { getEstimates, deleteEstimate, updateEstimate } from "../../../services/Estimates";
 import { createInvoice } from "../../../services/invoices";
-import { getClients, getVehicleDisplay } from "../../../services/clients";
+import { getVehicleDisplay } from "../../../services/clients";
 import type { Estimate } from "../../../services/Estimates";
-import type { Client } from "../../../services/clients";
 import api from "../../../services/api";
 
 type FilterType = "todos" | "accepted" | "pending" | "converted";
@@ -48,7 +47,6 @@ export default function Orcamentos() {
   const navigate = useNavigate();
 
   const [orcamentos, setOrcamentos] = useState<Estimate[]>([]);
-  const [clientes, setClientes] = useState<Client[]>([]);
   const [filtro, setFiltro] = useState<FilterType>("todos");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,16 +71,12 @@ export default function Orcamentos() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const [estimatesData, clientsData] = await Promise.all([
-        getEstimates(),
-        getClients(),
-      ]);
+      const estimatesData = await getEstimates();
       const convertedEstimates = estimatesData.map(est => ({
         ...est,
         status: reverseStatusMap[est.status] || est.status,
       }));
       setOrcamentos(convertedEstimates);
-      setClientes(clientsData);
     } catch (err: any) {
       setError(err.response?.data?.message || "Erro ao carregar orçamentos");
     } finally {
@@ -158,57 +152,47 @@ export default function Orcamentos() {
     }
   };
 
-  const getClienteInfo = (clientId: number) => {
-    const cliente = clientes.find((c) => c.id === clientId);
-    return {
-      nome: cliente?.name || "Cliente não encontrado",
-      placa: cliente?.plate || "",
-      veiculo: cliente ? getVehicleDisplay(cliente) : "Não informado",
-    };
-  };
-
   const handleWhatsApp = async (orcamento: Estimate) => {
-  const cliente = clientes.find((c) => c.id === orcamento.clientId);
-  if (!cliente) {
-    alert("Cliente não encontrado");
-    return;
-  }
+    const cliente = orcamento.client;
+    if (!cliente) {
+      alert("Cliente não encontrado");
+      return;
+    }
 
-  let telefone = cliente.phone.replace(/\D/g, "");
-  if (telefone.length === 10 || telefone.length === 11) {
-    telefone = "55" + telefone;
-  }
+    let telefone = cliente.phone.replace(/\D/g, "");
+    if (telefone.length === 10 || telefone.length === 11) {
+      telefone = "55" + telefone;
+    }
 
-  try {
-    const response = await api.post(`/estimates/${orcamento.id}/share`);
-    const { url: link } = response.data;
+    try {
+      const response = await api.post(`/estimates/${orcamento.id}/share`);
+      const { url: link } = response.data;
 
-    const clienteInfo = getClienteInfo(orcamento.clientId);
+      const vehicleDisplay = getVehicleDisplay(cliente);
 
-    // Link isolado no início da mensagem
-    const mensagem = encodeURIComponent(
-      `${link}
+      const mensagem = encodeURIComponent(
+        `${link}
 
 Olá ${cliente.name}!
 
 Seu orçamento está pronto ✅
 
-👤 Cliente: ${clienteInfo.nome}
-🚗 Veículo: ${clienteInfo.veiculo}
+👤 Cliente: ${cliente.name}
+🚗 Veículo: ${vehicleDisplay}
 💰 Total: R$ ${orcamento.total.toFixed(2)}
 📌 Status: ${getStatusLabel(orcamento.status)}`
-    );
+      );
 
-    window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
-  } catch (error) {
-    console.error("Erro ao gerar link do orçamento:", error);
-    alert("Erro ao gerar link do orçamento. Tente novamente.");
-  }
-};
+      window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
+    } catch (error) {
+      console.error("Erro ao gerar link do orçamento:", error);
+      alert("Erro ao gerar link do orçamento. Tente novamente.");
+    }
+  };
 
   const handlePDF = (orcamento: Estimate) => {
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
-    const clienteInfo = getClienteInfo(orcamento.clientId);
+    const cliente = orcamento.client;
 
     const win = window.open("", "_blank");
     if (win) {
@@ -243,9 +227,9 @@ Seu orçamento está pronto ✅
               </div>
             </div>
             <h1>Orçamento</h1>
-            <p><strong>Cliente:</strong> ${clienteInfo.nome}</p>
-            <p><strong>Veículo:</strong> ${clienteInfo.veiculo}</p>
-            <p><strong>Placa:</strong> ${clienteInfo.placa}</p>
+            <p><strong>Cliente:</strong> ${cliente?.name || "Cliente não encontrado"}</p>
+            <p><strong>Veículo:</strong> ${cliente ? getVehicleDisplay(cliente) : "Não informado"}</p>
+            <p><strong>Placa:</strong> ${cliente?.plate || ""}</p>
             <p><strong>Data:</strong> ${new Date(orcamento.date).toLocaleDateString("pt-BR")}</p>
             <p><strong>Status:</strong> ${getStatusLabel(orcamento.status)}</p>
             <div class="details">
@@ -505,7 +489,7 @@ Seu orçamento está pronto ✅
               </thead>
               <tbody>
                 {orcamentosFiltrados.map((o, index) => {
-                  const clienteInfo = getClienteInfo(o.clientId);
+                  const cliente = o.client;
                   return (
                     <tr
                       key={o.id}
@@ -520,10 +504,12 @@ Seu orçamento está pronto ✅
                       }
                     >
                       <td style={{ padding: "18px 16px", fontWeight: "500", color: "#fff" }}>
-                        {clienteInfo.nome}
+                        {cliente?.name || "Cliente não encontrado"}
                       </td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{clienteInfo.veiculo}</td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{clienteInfo.placa}</td>
+                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>
+                        {cliente ? getVehicleDisplay(cliente) : "Não informado"}
+                      </td>
+                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{cliente?.plate || ""}</td>
                       <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>
                         {new Date(o.date).toLocaleDateString("pt-BR")}
                       </td>

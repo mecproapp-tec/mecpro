@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiEdit, FiTrash2, FiCalendar, FiPlus, FiClock, FiArrowLeft, FiEye } from "react-icons/fi";
 
@@ -47,12 +47,24 @@ export default function Clientes() {
     }
   };
 
-  const obterProximoAgendamento = (clienteId: number): Appointment | null => {
+  // Memoize the mapping from clientId to next appointment
+  const nextAppointmentMap = useMemo(() => {
     const agora = new Date();
     const futuros = agendamentos
-      .filter(a => a.clientId === clienteId && new Date(a.date) > agora)
+      .filter(a => new Date(a.date) > agora)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return futuros.length > 0 ? futuros[0] : null;
+
+    const map = new Map<number, Appointment>();
+    for (const a of futuros) {
+      if (!map.has(a.clientId)) {
+        map.set(a.clientId, a);
+      }
+    }
+    return map;
+  }, [agendamentos]);
+
+  const obterProximoAgendamento = (clienteId: number): Appointment | null => {
+    return nextAppointmentMap.get(clienteId) || null;
   };
 
   const abrirAgendamento = (appointmentId: number) => {

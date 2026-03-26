@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiTrash2, FiPlus, FiArrowLeft, FiFileText, FiMessageCircle, FiEye } from "react-icons/fi";
 import { getInvoices, deleteInvoice, updateInvoice, calculateTotalWithIss } from "../../../services/invoices";
 import type { Invoice } from "../../../services/invoices";
-import { getClients, getVehicleDisplay } from "../../../services/clients";
-import type { Client } from "../../../services/clients";
+import { getVehicleDisplay } from "../../../services/clients";
 import api from "../../../services/api";
 
 type FilterType = "todos" | "PENDING" | "PAID" | "CANCELED";
@@ -12,7 +11,6 @@ type FilterType = "todos" | "PENDING" | "PAID" | "CANCELED";
 export default function Faturas() {
   const navigate = useNavigate();
   const [faturas, setFaturas] = useState<Invoice[]>([]);
-  const [clientes, setClientes] = useState<Client[]>([]);
   const [filtro, setFiltro] = useState<FilterType>("todos");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -37,12 +35,8 @@ export default function Faturas() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const [invoicesData, clientsData] = await Promise.all([
-        getInvoices(),
-        getClients(),
-      ]);
+      const invoicesData = await getInvoices();
       setFaturas(invoicesData);
-      setClientes(clientsData);
     } catch (err: any) {
       setError(err.response?.data?.message || "Erro ao carregar faturas");
     } finally {
@@ -75,64 +69,54 @@ export default function Faturas() {
     }
   };
 
-  const getClienteInfo = (clientId: number) => {
-    const cliente = clientes.find((c) => c.id === clientId);
-    return {
-      nome: cliente?.name || "Cliente não encontrado",
-      placa: cliente?.plate || "",
-      veiculo: cliente ? getVehicleDisplay(cliente) : "Não informado",
-    };
-  };
-
   const handleWhatsApp = async (fatura: Invoice) => {
-  const cliente = clientes.find((c) => c.id === fatura.clientId);
-  if (!cliente) {
-    alert("Cliente não encontrado");
-    return;
-  }
+    const cliente = fatura.client;
+    if (!cliente) {
+      alert("Cliente não encontrado");
+      return;
+    }
 
-  let telefone = cliente.phone.replace(/\D/g, "");
-  if (telefone.length === 10 || telefone.length === 11) {
-    telefone = "55" + telefone;
-  }
+    let telefone = cliente.phone.replace(/\D/g, "");
+    if (telefone.length === 10 || telefone.length === 11) {
+      telefone = "55" + telefone;
+    }
 
-  try {
-    const response = await api.post(`/invoices/${fatura.id}/share`);
-    const { url: link } = response.data;
+    try {
+      const response = await api.post(`/invoices/${fatura.id}/share`);
+      const { url: link } = response.data;
 
-    const clienteInfo = getClienteInfo(fatura.clientId);
+      const vehicleDisplay = getVehicleDisplay(cliente);
 
-    // Link isolado no início da mensagem
-    const mensagem = encodeURIComponent(
-      `${link}
+      const mensagem = encodeURIComponent(
+        `${link}
 
 Olá ${cliente.name}!
 
 Sua fatura ${fatura.number} está disponível ✅
 
-👤 Cliente: ${clienteInfo.nome}
-🚗 Veículo: ${clienteInfo.veiculo}
+👤 Cliente: ${cliente.name}
+🚗 Veículo: ${vehicleDisplay}
 💰 Total: R$ ${fatura.total.toFixed(2)}
 📌 Status: ${
-        fatura.status === "PAID"
-          ? "Paga"
-          : fatura.status === "PENDING"
-          ? "Pendente"
-          : "Cancelada"
-      }`
-    );
+          fatura.status === "PAID"
+            ? "Paga"
+            : fatura.status === "PENDING"
+            ? "Pendente"
+            : "Cancelada"
+        }`
+      );
 
-    window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
-  } catch (error) {
-    console.error("Erro ao gerar link da fatura:", error);
-    alert("Erro ao gerar link da fatura. Tente novamente.");
-  }
-};
+      window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
+    } catch (error) {
+      console.error("Erro ao gerar link da fatura:", error);
+      alert("Erro ao gerar link da fatura. Tente novamente.");
+    }
+  };
 
   const handlePDF = (fatura: Invoice) => {
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
     const totalComIss = calculateTotalWithIss(fatura.items);
-    const clienteInfo = getClienteInfo(fatura.clientId);
+    const cliente = fatura.client;
 
     const win = window.open("", "_blank");
     if (win) {
@@ -168,9 +152,9 @@ Sua fatura ${fatura.number} está disponível ✅
             </div>
             <h1>Fatura</h1>
             <p><strong>Número:</strong> ${fatura.number}</p>
-            <p><strong>Cliente:</strong> ${clienteInfo.nome}</p>
-            <p><strong>Veículo:</strong> ${clienteInfo.veiculo}</p>
-            <p><strong>Placa:</strong> ${clienteInfo.placa}</p>
+            <p><strong>Cliente:</strong> ${cliente?.name || "Cliente não encontrado"}</p>
+            <p><strong>Veículo:</strong> ${cliente ? getVehicleDisplay(cliente) : "Não informado"}</p>
+            <p><strong>Placa:</strong> ${cliente?.plate || ""}</p>
             <p><strong>Data:</strong> ${new Date(fatura.createdAt).toLocaleDateString("pt-BR")}</p>
             <p><strong>Status:</strong> ${
               fatura.status === "PAID"
@@ -285,7 +269,7 @@ Sua fatura ${fatura.number} está disponível ✅
                 cursor: "pointer",
                 fontSize: "24px",
                 transition: "all 0.2s",
-                boxShadow: "0 4px 12px rgba(0, 229, 255, 0.2)",
+                boxShadow: "0 4px 12px rgba(0,229,255,0.2)",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "#2a2a2a")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "#1a1a1a")}
@@ -294,9 +278,9 @@ Sua fatura ${fatura.number} está disponível ✅
             </button>
             <h1
               style={{
-                fontSize: "clamp(32px, 5vw, 48px)",
+                fontSize: "clamp(32px,5vw,48px)",
                 fontWeight: "700",
-                background: "linear-gradient(135deg, #00e5ff, #7fdbff)",
+                background: "linear-gradient(135deg,#00e5ff,#7fdbff)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 margin: 0,
@@ -405,7 +389,7 @@ Sua fatura ${fatura.number} está disponível ✅
               </thead>
               <tbody>
                 {faturasFiltradas.map((f, index) => {
-                  const clienteInfo = getClienteInfo(f.clientId);
+                  const cliente = f.client;
                   return (
                     <tr
                       key={f.id}
@@ -420,9 +404,11 @@ Sua fatura ${fatura.number} está disponível ✅
                       }
                     >
                       <td style={{ padding: "18px 16px", fontWeight: "500", color: "#fff" }}>{f.number}</td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{clienteInfo.nome}</td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{clienteInfo.veiculo}</td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{clienteInfo.placa}</td>
+                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{cliente?.name || "Cliente não encontrado"}</td>
+                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>
+                        {cliente ? getVehicleDisplay(cliente) : "Não informado"}
+                      </td>
+                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{cliente?.plate || ""}</td>
                       <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>
                         {new Date(f.createdAt).toLocaleDateString("pt-BR")}
                       </td>
