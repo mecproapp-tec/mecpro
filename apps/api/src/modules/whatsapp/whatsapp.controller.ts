@@ -1,11 +1,10 @@
-// src/modules/whatsapp/whatsapp.controller.ts
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { SendWhatsappDto } from './dto/send-whatsapp.dto';
-import { TenantGuard } from '../common/guards/tenant.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 
 @Controller('whatsapp')
-@UseGuards(TenantGuard)
+@UseGuards(JwtAuthGuard)
 export class WhatsappController {
   constructor(private whatsappService: WhatsappService) {}
 

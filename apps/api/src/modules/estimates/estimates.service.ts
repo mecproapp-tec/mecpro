@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, UnauthorizedException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { EstimateStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
@@ -8,6 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { StorageService } from '../storage/storage.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+
+// ... resto do código, já ajustado anteriormente
 
 @Injectable()
 export class EstimatesService {

@@ -1,9 +1,8 @@
-// src/modules/pdf/pdf.processor.ts
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { PdfService } from './pdf.service';
 import { StorageService } from '../storage/storage.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../shared/prisma/prisma.service';
 import { Logger } from '@nestjs/common';
 
 @Processor('pdf')
@@ -18,20 +17,33 @@ export class PdfProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ tenantId: string; entityId: string; entityType: string; data: any }>): Promise<any> {
+  async process(job: Job<{ tenantId: string; entityId: number; entityType: string; data: any }>): Promise<any> {
     const { tenantId, entityId, entityType, data } = job.data;
-    this.logger.log(`Processing PDF generation for ${entityType} ${entityId}`);
+    this.logger.log(`Gerando PDF para ${entityType} ID ${entityId}`);
 
-    const pdfBuffer = await this.pdfService.generateFromData(data);
-    const url = await this.storageService.upload(pdfBuffer, `${tenantId}/${entityType}/${entityId}.pdf`);
+    try {
+      const pdfBuffer = await this.pdfService.generateFromData(data);
+      const key = `${tenantId}/${entityType}/${entityId}.pdf`;
+      const url = await this.storageService.upload(pdfBuffer, key);
 
-    const updateData = { pdfUrl: url };
-    await this.prisma[entityType].update({
-      where: { id: entityId, tenantId },
-      data: updateData,
-    });
+      await this.prisma[entityType].update({
+        where: { id: entityId, tenantId },
+        data: {
+          pdfUrl: url,
+          pdfStatus: 'generated',
+          pdfGeneratedAt: new Date(),
+        },
+      });
 
-    this.logger.log(`PDF generated and stored at ${url}`);
-    return { url };
+      this.logger.log(`PDF salvo em ${url}`);
+      return { url };
+    } catch (error) {
+      this.logger.error(`Erro: ${error.message}`);
+      await this.prisma[entityType].update({
+        where: { id: entityId, tenantId },
+        data: { pdfStatus: 'failed' },
+      });
+      throw error;
+    }
   }
 }

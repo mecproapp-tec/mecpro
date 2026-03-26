@@ -19,7 +19,7 @@ export class EstimatePdfProcessor extends WorkerHost {
 
   async process(job: Job<{ tenantId: string; estimateId: number; tenantData: any; estimateData: any }>): Promise<any> {
     const { tenantId, estimateId, tenantData, estimateData } = job.data;
-    this.logger.log(`Processando geração de PDF para orçamento ${estimateId}`);
+    this.logger.log(`Gerando PDF para orçamento ${estimateId}`);
 
     try {
       const pdfBuffer = await this.estimatesPdfService.generateEstimatePdf(estimateData, tenantData);
@@ -35,10 +35,10 @@ export class EstimatePdfProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(`PDF do orçamento ${estimateId} salvo em ${url}`);
+      this.logger.log(`PDF salvo em ${url}`);
       return { url };
     } catch (error) {
-      this.logger.error(`Erro ao gerar PDF para orçamento ${estimateId}: ${error.message}`);
+      this.logger.error(`Erro: ${error.message}`);
       await this.prisma.estimate.update({
         where: { id: estimateId, tenantId },
         data: { pdfStatus: 'failed' },

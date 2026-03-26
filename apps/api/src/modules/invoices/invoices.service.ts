@@ -3,14 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
   UnauthorizedException,
-  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
-import * as puppeteer from 'puppeteer';
-import * as Handlebars from 'handlebars';
-import * as path from 'path';
-import * as fs from 'fs/promises';
 import { randomBytes } from 'crypto';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { ConfigService } from '@nestjs/config';
@@ -18,6 +13,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { StorageService } from '../storage/storage.service';
 import { InvoicesPdfService } from './invoices-pdf.service';
+
+
 
 @Injectable()
 export class InvoicesService {

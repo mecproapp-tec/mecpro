@@ -1,14 +1,9 @@
-// src/modules/pdf/pdf.controller.ts
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Req } from '@nestjs/common';
 import { PdfService } from './pdf.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { GeneratePdfDto } from './dto/generate-pdf.dto';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
 
 @Controller('pdf')
-@UseGuards(TenantGuard)
 export class PdfController {
   constructor(
     private pdfService: PdfService,
@@ -16,13 +11,15 @@ export class PdfController {
   ) {}
 
   @Post('generate')
-  async generateSync(@Tenant() tenantId: string, @Body() dto: GeneratePdfDto) {
+  async generateSync(@Body() dto: any, @Req() req) {
+    const tenantId = req.user?.tenantId;
     const pdfBuffer = await this.pdfService.generateFromData(dto.data);
     return { buffer: pdfBuffer.toString('base64') };
   }
 
   @Post('generate-async')
-  async generateAsync(@Tenant() tenantId: string, @Body() dto: GeneratePdfDto) {
+  async generateAsync(@Body() dto: any, @Req() req) {
+    const tenantId = req.user?.tenantId;
     await this.pdfQueue.add('generate', {
       tenantId,
       entityId: dto.entityId,

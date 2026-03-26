@@ -1,5 +1,4 @@
-// src/modules/pdf/pdf.service.ts
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -32,6 +31,6 @@ export class PdfService {
       margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
     });
     await browser.close();
-    return pdfBuffer;
+    return Buffer.from(pdfBuffer); // converte Uint8Array para Buffer
   }
 }

@@ -19,7 +19,7 @@ export class InvoicePdfProcessor extends WorkerHost {
 
   async process(job: Job<{ tenantId: string; invoiceId: number; tenantData: any; invoiceData: any }>): Promise<any> {
     const { tenantId, invoiceId, tenantData, invoiceData } = job.data;
-    this.logger.log(`Processando geração de PDF para fatura ${invoiceId}`);
+    this.logger.log(`Gerando PDF para fatura ${invoiceId}`);
 
     try {
       const pdfBuffer = await this.invoicesPdfService.generateInvoicePdf(invoiceData, tenantData);
@@ -35,10 +35,10 @@ export class InvoicePdfProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(`PDF da fatura ${invoiceId} salvo em ${url}`);
+      this.logger.log(`PDF salvo em ${url}`);
       return { url };
     } catch (error) {
-      this.logger.error(`Erro ao gerar PDF para fatura ${invoiceId}: ${error.message}`);
+      this.logger.error(`Erro: ${error.message}`);
       await this.prisma.invoice.update({
         where: { id: invoiceId, tenantId },
         data: { pdfStatus: 'failed' },
