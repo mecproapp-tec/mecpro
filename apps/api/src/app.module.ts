@@ -17,9 +17,9 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { AppointmentsModule } from "./modules/appointments/appointments.module";
 import { ContactModule } from "./modules/contact/contact.module";
 import { WhatsappModule } from "./modules/whatsapp/whatsapp.module";
-
-// ❌ Remova esta linha se existir
-// import { PublicModule } from "./modules/public/public.module";
+import { QueueModule } from "./modules/common/queues/queue.module";
+import { PdfModule } from "./modules/pdf/pdf.module";
+import { StorageModule } from "./modules/storage/storage.module";
 
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
@@ -42,7 +42,9 @@ import { AppService } from "./app.service";
     AppointmentsModule,
     ContactModule,
     WhatsappModule,
-    // ❌ Não inclua PublicModule aqui
+    QueueModule,
+    PdfModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService],

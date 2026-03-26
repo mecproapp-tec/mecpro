@@ -221,9 +221,16 @@ model Estimate {
   items             EstimateItem[]
   invoice           Invoice?
 
+  pdfUrl            String?        @map("pdf_url") @db.Text
+  pdfStatus         String?        @default("pending") @map("pdf_status")
+  pdfGeneratedAt    DateTime?      @map("pdf_generated_at")
+
   @@index([tenantId])
   @@index([clientId])
   @@index([status])
+  @@index([pdfUrl])
+  @@index([pdfStatus])
+  @@index([tenantId, pdfStatus])
 }
 
 model EstimateItem {
@@ -272,10 +279,17 @@ model Invoice {
   tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             InvoiceItem[]
 
+  pdfUrl            String?        @map("pdf_url") @db.Text
+  pdfStatus         String?        @default("pending") @map("pdf_status")
+  pdfGeneratedAt    DateTime?      @map("pdf_generated_at")
+
   @@index([tenantId])
   @@index([clientId])
   @@index([status])
   @@index([number])
+  @@index([pdfUrl])
+  @@index([pdfStatus])
+  @@index([tenantId, pdfStatus])
 }
 
 model InvoiceItem {

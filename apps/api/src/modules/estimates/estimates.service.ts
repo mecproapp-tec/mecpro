@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, UnauthorizedException, Inject } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { EstimateStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { EstimatesPdfService } from './estimates-pdf.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { ConfigService } from '@nestjs/config';
+import { StorageService } from '../storage/storage.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class EstimatesService {
@@ -13,6 +16,8 @@ export class EstimatesService {
     private estimatesPdfService: EstimatesPdfService,
     private whatsappService: WhatsappService,
     private configService: ConfigService,
+    private storageService: StorageService,
+    @InjectQueue('pdf-estimate') private pdfQueue: Queue,
   ) {}
 
   async create(tenantId: string, data: { clientId: number; date: string; items: any[] }) {
@@ -156,19 +161,14 @@ export class EstimatesService {
   }
 
   async getPdfByShareToken(token: string): Promise<Buffer> {
-    console.log(`[EstimatesService] Buscando PDF para token: ${token}`);
     const estimate = await this.validateShareToken(token);
-    console.log(`[EstimatesService] Orçamento encontrado: ${estimate.id}`);
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: estimate.tenantId },
     });
-    console.log(`[EstimatesService] Tenant: ${tenant?.id}`);
     try {
       const pdf = await this.estimatesPdfService.generateEstimatePdf(estimate, tenant);
-      console.log(`[EstimatesService] PDF gerado, tamanho: ${pdf.length} bytes`);
       return pdf;
     } catch (err) {
-      console.error(`[EstimatesService] Erro ao gerar PDF:`, err);
       throw err;
     }
   }
@@ -176,23 +176,58 @@ export class EstimatesService {
   async sendViaWhatsApp(
     id: number,
     tenantId: string,
-  ): Promise<{ whatsappLink: string; message: string; pdfUrl: string }> {
-    const estimate = await this.findOne(id, tenantId);
+  ): Promise<{ whatsappLink?: string; message: string; pdfUrl?: string; queued?: boolean }> {
+    const estimate = await this.prisma.estimate.findFirst({
+      where: { id, tenantId },
+      include: { client: true, items: true, tenant: true },
+    });
+    if (!estimate) throw new NotFoundException('Orçamento não encontrado');
     const client = estimate.client;
 
     if (!client.phone) {
       throw new BadRequestException('Cliente não possui telefone cadastrado');
     }
 
-    const token = await this.generateShareToken(id, tenantId);
+    if (estimate.pdfUrl && estimate.pdfStatus === 'generated') {
+      const pdfUrl = estimate.pdfUrl;
+      const message = this.buildWhatsAppMessage(estimate, pdfUrl);
+      const whatsappLink = this.whatsappService.generateWhatsAppLink(client.phone, message);
+      return {
+        whatsappLink,
+        message,
+        pdfUrl,
+      };
+    }
 
-    const baseUrl =
-      this.configService.get<string>('APP_URL')?.replace(/\/$/, '') ||
-      'http://localhost:3000';
+    const tenant = estimate.tenant;
+    const estimateData = {
+      ...estimate,
+      items: estimate.items,
+      client: estimate.client,
+    };
+    await this.pdfQueue.add('generate-estimate-pdf', {
+      tenantId,
+      estimateId: id,
+      tenantData: tenant,
+      estimateData,
+    });
 
-    const pdfUrl = `${baseUrl}/api/public/estimates/share/${token}`;
+    if (!estimate.pdfStatus || estimate.pdfStatus === 'failed') {
+      await this.prisma.estimate.update({
+        where: { id, tenantId },
+        data: { pdfStatus: 'pending' },
+      });
+    }
 
-    const message = `Olá ${client.name}!
+    return {
+      message: 'PDF em processamento. O link será enviado em breve.',
+      queued: true,
+    };
+  }
+
+  private buildWhatsAppMessage(estimate: any, pdfUrl: string): string {
+    const client = estimate.client;
+    return `Olá ${client.name}!
 
 Seu orçamento está pronto ✅
 
@@ -203,16 +238,5 @@ ${pdfUrl}
 🚗 Veículo: ${client.vehicle || 'Não informado'}
 💰 Total: R$ ${estimate.total.toFixed(2)}
 📌 Status: ${estimate.status === 'DRAFT' ? 'Pendente' : estimate.status === 'APPROVED' ? 'Aceito' : 'Convertido'}`;
-
-    const whatsappLink = this.whatsappService.generateWhatsAppLink(
-      client.phone,
-      message,
-    );
-
-    return {
-      whatsappLink,
-      message,
-      pdfUrl,
-    };
   }
 }

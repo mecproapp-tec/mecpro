@@ -73,20 +73,16 @@ export class PublicEstimatesController {
   @Public()
   @Get('share/:token')
   async getSharedPdf(@Param('token') token: string, @Res() res: Response) {
-    console.log(`[PublicEstimates] Recebido token: ${token}`);
     if (!token) {
-      console.error('[PublicEstimates] Token não fornecido');
       return res.status(400).send('Token não fornecido');
     }
 
     try {
       const pdfBuffer = await this.estimatesService.getPdfByShareToken(token);
-      console.log(`[PublicEstimates] PDF gerado, enviando...`);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline; filename=orcamento.pdf');
       return res.send(pdfBuffer);
     } catch (error) {
-      console.error('[PublicEstimates] Erro ao gerar PDF:', error);
       if (error.message === 'Token inválido' || error.message === 'Token expirado') {
         return res.status(404).send('Link inválido ou expirado');
       }

@@ -1,0 +1,10 @@
+@keyframes blink-bg {
+  0% { background-color: #111; border-left-color: #ff4444; }
+  50% { background-color: #2a1a1a; border-left-color: #ff8888; }
+  100% { background-color: #111; border-left-color: #ff4444; }
+}
+
+.agendamento-atrasado {
+  animation: blink-bg 1s infinite;
+  border-left: 4px solid #ff4444;
+}

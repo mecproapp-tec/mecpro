@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../shared/prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
@@ -7,22 +6,8 @@ import puppeteer from 'puppeteer';
 
 @Injectable()
 export class InvoicesPdfService {
-  constructor(private prisma: PrismaService) {}
-
-  async getPdfByShareToken(token: string): Promise<Buffer> {
-    const invoice = await this.prisma.invoice.findFirst({
-      where: { shareToken: token },
-      include: {
-        items: true,
-        client: true,
-      },
-    });
-
-    if (!invoice) {
-      throw new Error('Fatura não encontrada');
-    }
-
-    const client = invoice.client as any; // cast para any para acessar campos novos
+  async generateInvoicePdf(invoice: any, tenant: any): Promise<Buffer> {
+    const client = invoice.client;
 
     const vehicleDetails =
       client?.vehicleBrand && client?.vehicleModel
@@ -75,11 +60,11 @@ export class InvoicesPdfService {
       issRate: 0,
       issValue: issTotal.toFixed(2),
       total: total.toFixed(2),
-      companyName: process.env.COMPANY_NAME || 'Oficina',
-      companyDocument: process.env.COMPANY_DOCUMENT || '',
-      companyPhone: process.env.COMPANY_PHONE || '',
-      companyEmail: process.env.COMPANY_EMAIL || '',
-      logoUrl: process.env.LOGO_URL || '',
+      companyName: tenant?.name || process.env.COMPANY_NAME || 'Oficina',
+      companyDocument: tenant?.documentNumber || process.env.COMPANY_DOCUMENT || '',
+      companyPhone: tenant?.phone || process.env.COMPANY_PHONE || '',
+      companyEmail: tenant?.email || process.env.COMPANY_EMAIL || '',
+      logoUrl: tenant?.logoUrl || process.env.LOGO_URL || '',
     };
 
     const html = template(data);
