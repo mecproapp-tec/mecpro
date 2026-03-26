@@ -1,5 +1,11 @@
 {
-  "build": {
-    "root": "apps/api"
-  }
+  "services": [
+    {
+      "name": "api",
+      "root": "apps/api",
+      "build": {
+        "builder": "DOCKERFILE"
+      }
+    }
+  ]
 }

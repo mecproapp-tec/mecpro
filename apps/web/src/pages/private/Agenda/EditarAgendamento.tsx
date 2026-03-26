@@ -3,6 +3,54 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FiSave, FiArrowLeft } from "react-icons/fi";
 import { getAppointmentById, updateAppointment } from "../../../services/appointments";
 
+const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
+
+// Formata a data/hora recebida do backend (já convertida para o fuso Brasil) para os campos <input>
+const formatBrazilDateTimeForInput = (date: Date) => {
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  const hour = parts.find(p => p.type === 'hour')?.value;
+  const minute = parts.find(p => p.type === 'minute')?.value;
+  return {
+    date: `${year}-${month}-${day}`,
+    time: `${hour}:${minute}`,
+  };
+};
+
+// Retorna a data/hora atual no horário de Brasília
+const getBrazilNow = (): Date => {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  const hour = parts.find(p => p.type === 'hour')?.value;
+  const minute = parts.find(p => p.type === 'minute')?.value;
+  const second = parts.find(p => p.type === 'second')?.value;
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+};
+
 export default function EditarAgendamento() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -25,12 +73,9 @@ export default function EditarAgendamento() {
       const app = await getAppointmentById(Number(id));
       setAgendamento(app);
 
+      // A data vinda do backend já está no fuso Brasil (convertida pelo service)
       const dateObj = new Date(app.date);
-      const dataStr = dateObj.toLocaleDateString("sv-SE");
-      const horaStr = dateObj.toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const { date: dataStr, time: horaStr } = formatBrazilDateTimeForInput(dateObj);
 
       setData(dataStr);
       setHora(horaStr);
@@ -50,11 +95,11 @@ export default function EditarAgendamento() {
       return;
     }
 
-    const now = new Date();
     const selected = new Date(`${data}T${hora}:00`);
+    const nowBrazil = getBrazilNow();
 
-    if (selected < now) {
-      alert("Não é possível agendar no passado");
+    if (selected < nowBrazil) {
+      alert("Não é possível agendar no passado (horário de Brasília)");
       return;
     }
 

@@ -4,6 +4,31 @@ import { FiSave, FiArrowLeft } from "react-icons/fi";
 import { getClientById, type Client } from "../../../services/clients";
 import { createAppointment } from "../../../services/appointments";
 
+const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
+
+// Retorna a data/hora atual no horário de Brasília
+const getBrazilNow = (): Date => {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: BRAZIL_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  const hour = parts.find(p => p.type === 'hour')?.value;
+  const minute = parts.find(p => p.type === 'minute')?.value;
+  const second = parts.find(p => p.type === 'second')?.value;
+  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+};
+
 export default function Agendamento() {
   const navigate = useNavigate();
   const { clienteId } = useParams();
@@ -40,11 +65,12 @@ export default function Agendamento() {
       return;
     }
 
-    const now = new Date();
+    // Constrói a data no horário de Brasília
     const selected = new Date(`${data}T${hora}:00`);
+    const nowBrazil = getBrazilNow();
 
-    if (selected < now) {
-      alert("Não é possível agendar no passado");
+    if (selected < nowBrazil) {
+      alert("Não é possível agendar no passado (horário de Brasília)");
       return;
     }
 

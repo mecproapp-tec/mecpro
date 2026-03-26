@@ -3,6 +3,19 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FiArrowLeft } from "react-icons/fi";
 import { getAppointmentById } from "../../../services/appointments";
 
+const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
+
+// Formata a data para exibição no padrão brasileiro (dd/MM/yyyy HH:mm)
+const formatBrazilDateTime = (date: Date) => {
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: BRAZIL_TIMEZONE,
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+  const [datePart, timePart] = formatter.format(date).split(' ');
+  return { date: datePart, time: timePart };
+};
+
 export default function VerAgendamento() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -41,12 +54,8 @@ export default function VerAgendamento() {
     );
   }
 
-  const dataObj = new Date(agendamento.date);
-  const dataStr = dataObj.toLocaleDateString("pt-BR");
-  const horaStr = dataObj.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const dateObj = new Date(agendamento.date);
+  const { date: dataStr, time: horaStr } = formatBrazilDateTime(dateObj);
 
   return (
     <div style={styles.container}>

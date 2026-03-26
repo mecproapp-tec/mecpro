@@ -1,3 +1,6 @@
+// Define o fuso horário para o Brasil (São Paulo)
+process.env.TZ = 'America/Sao_Paulo';
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -19,14 +22,12 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Desativa políticas que bloqueiam CORS
   app.use(helmet({
     crossOriginResourcePolicy: false,
     crossOriginOpenerPolicy: false,
     crossOriginEmbedderPolicy: false,
   }));
 
-  // Configuração CORS com tratamento explícito
   app.enableCors({
     origin: (origin, callback) => {
       const allowedOrigins = [
@@ -48,7 +49,6 @@ async function bootstrap() {
     optionsSuccessStatus: 200,
   });
 
-  // Middleware manual para garantir resposta OPTIONS
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     const allowed = [
@@ -72,7 +72,6 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.setGlobalPrefix('api');
 
-  // Adiciona um endpoint de saúde simples
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });

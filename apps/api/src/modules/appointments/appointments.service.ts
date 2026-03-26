@@ -6,11 +6,14 @@ export class AppointmentsService {
   constructor(private prisma: PrismaService) {}
 
   async create(tenantId: string, data: { clientId: number; date: string; comment?: string }) {
+    // A string de data é interpretada no fuso configurado (America/Sao_Paulo)
+    const appointmentDate = new Date(data.date);
+
     return this.prisma.appointment.create({
       data: {
         clientId: data.clientId,
         tenantId,
-        date: new Date(data.date),
+        date: appointmentDate,
         comment: data.comment,
       },
       include: { client: true },
@@ -36,11 +39,14 @@ export class AppointmentsService {
 
   async update(id: number, tenantId: string, data: { clientId: number; date: string; comment?: string }) {
     await this.findOne(id, tenantId);
+
+    const appointmentDate = new Date(data.date);
+
     return this.prisma.appointment.update({
       where: { id },
       data: {
         clientId: data.clientId,
-        date: new Date(data.date),
+        date: appointmentDate,
         comment: data.comment,
       },
       include: { client: true },
