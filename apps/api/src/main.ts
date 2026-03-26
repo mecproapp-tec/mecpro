@@ -92,5 +92,33 @@ async function bootstrap() {
     console.error('❌ Falha ao iniciar servidor:', err);
     process.exit(1);
   }
+
+  
 }
 bootstrap();
+
+import fs from 'fs';
+import path from 'path';
+
+function debugTemplates() {
+  const base = process.cwd();
+
+  console.log('📁 ROOT:', base);
+
+  function listDir(dir: string) {
+    try {
+      const files = fs.readdirSync(dir);
+      console.log(`📂 ${dir}:`, files);
+    } catch (err) {
+      console.log(`❌ ${dir} não existe`);
+    }
+  }
+
+  listDir(base);
+  listDir(path.join(base, 'src'));
+  listDir(path.join(base, 'dist'));
+  listDir(path.join(base, 'templates'));
+  listDir(path.join(base, 'dist/templates'));
+}
+
+debugTemplates();
