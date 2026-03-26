@@ -81,6 +81,8 @@ async function bootstrap() {
   const host = '0.0.0.0';
 
   try {
+    console.log(`📡 Tentando iniciar servidor em ${host}:${port}`);
+    
     const server = await app.listen(port, host);
     const address = server.address();
     console.log(`✅ Servidor ouvindo em http://${host}:${port}`);
