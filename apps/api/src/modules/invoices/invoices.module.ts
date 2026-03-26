@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { InvoicesService } from './invoices.service';
 import { InvoicesController, PublicInvoicesController } from './invoices.controller';
 import { PrismaModule } from '../../shared/prisma/prisma.module';
@@ -13,6 +14,7 @@ import { ConfigModule } from '@nestjs/config';
     WhatsappModule,
     StorageModule,
     ConfigModule,
+    BullModule.registerQueue({ name: 'pdf' }),
   ],
   controllers: [InvoicesController, PublicInvoicesController],
   providers: [InvoicesService, InvoicesPdfService],

@@ -12,6 +12,8 @@ import { EstimatesPdfService } from './estimates-pdf.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { ConfigService } from '@nestjs/config';
 import { StorageService } from '../storage/storage.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class EstimatesService {
@@ -23,6 +25,7 @@ export class EstimatesService {
     private whatsappService: WhatsappService,
     private configService: ConfigService,
     private storageService: StorageService,
+    @InjectQueue('pdf') private pdfQueue: Queue,
   ) {}
 
   async create(tenantId: string, data: { clientId: number; date: string; items: any[] }) {
@@ -182,8 +185,8 @@ export class EstimatesService {
   async sendViaWhatsApp(
     id: number,
     tenantId: string,
-    workshopData?: any, // dados da oficina vindos do frontend
-  ): Promise<{ whatsappLink: string; message: string; pdfUrl: string }> {
+    workshopData?: any,
+  ): Promise<{ whatsappLink?: string; message: string; pdfUrl?: string; queued?: boolean }> {
     const estimate = await this.prisma.estimate.findFirst({
       where: { id, tenantId },
       include: { client: true, items: true, tenant: true },
@@ -202,35 +205,68 @@ export class EstimatesService {
       return { whatsappLink, message, pdfUrl };
     }
 
-    // Dados efetivos da oficina: prioriza workshopData (frontend) e completa com tenant
+    // Prepare data for PDF job
+    const tenant = estimate.tenant;
     const effectiveTenant = workshopData
       ? {
-          ...estimate.tenant,
-          name: workshopData.name || estimate.tenant.name,
-          documentNumber: workshopData.documentNumber || estimate.tenant.documentNumber,
-          phone: workshopData.phone || estimate.tenant.phone,
-          email: workshopData.email || estimate.tenant.email,
-          logoUrl: workshopData.logoUrl || estimate.tenant.logoUrl,
+          ...tenant,
+          name: workshopData.name || tenant.name,
+          documentNumber: workshopData.documentNumber || tenant.documentNumber,
+          phone: workshopData.phone || tenant.phone,
+          email: workshopData.email || tenant.email,
+          logoUrl: workshopData.logoUrl || tenant.logoUrl,
         }
-      : estimate.tenant;
+      : tenant;
 
-    this.logger.log(`Gerando PDF síncrono para orçamento ${id} usando dados ${workshopData ? 'do frontend' : 'do tenant'}`);
-    const pdfBuffer = await this.estimatesPdfService.generateEstimatePdf(estimate, effectiveTenant);
-    const key = `${tenantId}/estimates/${id}.pdf`;
-    const url = await this.storageService.upload(pdfBuffer, key);
+    const estimateData = {
+      logoUrl: effectiveTenant.logoUrl,
+      estimateNumber: estimate.id,
+      client: {
+        name: client.name,
+        document: client.document || 'Não informado',
+        address: client.address || 'Não informado',
+        phone: client.phone,
+        vehicle: client.vehicle,
+        plate: client.plate,
+      },
+      issueDate: new Date(estimate.date).toLocaleDateString('pt-BR'),
+      validUntil: new Date(new Date(estimate.date).getTime() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
+      status: estimate.status === 'DRAFT' ? 'Pendente' : estimate.status === 'APPROVED' ? 'Aceito' : 'Convertido',
+      items: estimate.items.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.price.toFixed(2),
+        issPercent: item.issPercent || 0,
+        total: item.total.toFixed(2),
+      })),
+      subtotal: estimate.items.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2),
+      issValue: estimate.items.reduce((acc, item) => {
+        const iss = item.issPercent ? item.price * (item.issPercent / 100) * item.quantity : 0;
+        return acc + iss;
+      }, 0).toFixed(2),
+      total: estimate.total.toFixed(2),
+      companyName: effectiveTenant.name || 'Oficina Mecânica',
+      companyDocument: effectiveTenant.documentNumber || '00.000.000/0001-00',
+      companyPhone: effectiveTenant.phone || '(11) 1234-5678',
+      companyEmail: effectiveTenant.email || 'contato@oficina.com',
+    };
+
+    await this.pdfQueue.add('generate', {
+      tenantId,
+      entityId: id,
+      entityType: 'estimate',
+      data: estimateData,
+    });
 
     await this.prisma.estimate.update({
       where: { id, tenantId },
-      data: {
-        pdfUrl: url,
-        pdfStatus: 'generated',
-        pdfGeneratedAt: new Date(),
-      },
+      data: { pdfStatus: 'pending' },
     });
 
-    const message = this.buildWhatsAppMessage(estimate, url);
-    const whatsappLink = this.whatsappService.generateWhatsAppLink(client.phone, message);
-    return { whatsappLink, message, pdfUrl: url };
+    return {
+      message: 'PDF em processamento. O link será enviado em breve.',
+      queued: true,
+    };
   }
 
   private buildWhatsAppMessage(estimate: any, pdfUrl: string): string {

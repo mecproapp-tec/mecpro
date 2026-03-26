@@ -10,8 +10,6 @@ export class EstimatesPdfService {
 
   async generateEstimatePdf(estimate: any, tenant: any): Promise<Buffer> {
     this.logger.log(`Gerando PDF para orçamento ${estimate.id}, tenant: ${tenant?.id}`);
-
-    // Log para verificar se o tenant tem logo
     this.logger.debug(`Logo URL: ${tenant?.logoUrl || 'não definido'}`);
 
     const items = estimate.items.map(item => ({
@@ -81,6 +79,7 @@ export class EstimatesPdfService {
 
     const browser = await puppeteer.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });

@@ -1,9 +1,11 @@
-import { Controller, Post, Body, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
 import { PdfService } from './pdf.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 
 @Controller('pdf')
+@UseGuards(JwtAuthGuard)
 export class PdfController {
   constructor(
     private pdfService: PdfService,
@@ -12,14 +14,13 @@ export class PdfController {
 
   @Post('generate')
   async generateSync(@Body() dto: any, @Req() req) {
-    const tenantId = req.user?.tenantId;
     const pdfBuffer = await this.pdfService.generateFromData(dto.data);
     return { buffer: pdfBuffer.toString('base64') };
   }
 
   @Post('generate-async')
   async generateAsync(@Body() dto: any, @Req() req) {
-    const tenantId = req.user?.tenantId;
+    const tenantId = req.user.tenantId;
     await this.pdfQueue.add('generate', {
       tenantId,
       entityId: dto.entityId,

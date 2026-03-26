@@ -83,7 +83,7 @@ export class InvoicesPdfService {
     this.logger.log('Lançando Puppeteer...');
     const browser = await puppeteer.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // força o caminho
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });

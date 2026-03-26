@@ -47,12 +47,8 @@ export class InvoicesController {
 
   @Post(':id/share')
   async generateShareLink(@Param('id') id: string, @Req() req) {
-    const token = await this.invoicesService.generateShareToken(
-      Number(id),
-      req.user.tenantId,
-    );
-    const baseUrl =
-      process.env.APP_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+    const token = await this.invoicesService.generateShareToken(Number(id), req.user.tenantId);
+    const baseUrl = process.env.APP_URL?.replace(/\/$/, '') || 'http://localhost:3000';
     const url = `${baseUrl}/api/public/invoices/share/${token}`;
     return { url };
   }
@@ -78,20 +74,14 @@ export class PublicInvoicesController {
   @Public()
   @Get('share/:token')
   async getSharedPdf(@Param('token') token: string, @Res() res: Response) {
-    console.log(`[PublicInvoices] Recebido token: ${token}`);
-    if (!token) {
-      console.error('[PublicInvoices] Token não fornecido');
-      return res.status(400).send('Token não fornecido');
-    }
+    if (!token) return res.status(400).send('Token não fornecido');
 
     try {
       const pdfBuffer = await this.invoicesService.getPdfByShareToken(token);
-      console.log(`[PublicInvoices] PDF gerado, enviando...`);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline; filename=fatura.pdf');
       return res.send(pdfBuffer);
     } catch (error) {
-      console.error('[PublicInvoices] Erro ao gerar PDF:', error);
       if (error.message === 'Token inválido' || error.message === 'Token expirado') {
         return res.status(404).send('Link inválido ou expirado');
       }

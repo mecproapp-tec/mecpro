@@ -51,10 +51,7 @@ export class EstimatesController {
 
   @Post(':id/share')
   async generateShareLink(@Param('id') id: string, @Req() req) {
-    const token = await this.estimatesService.generateShareToken(
-      Number(id),
-      req.user.tenantId,
-    );
+    const token = await this.estimatesService.generateShareToken(Number(id), req.user.tenantId);
     const baseUrl = process.env.APP_URL?.replace(/\/$/, '') || 'http://localhost:3000';
     const url = `${baseUrl}/api/public/estimates/share/${token}`;
     return { url };
@@ -63,7 +60,7 @@ export class EstimatesController {
   @Post(':id/send-whatsapp')
   async sendViaWhatsApp(
     @Param('id') id: string,
-    @Body() body: { workshopData?: any }, // aceita workshopData do frontend
+    @Body() body: { workshopData?: any },
     @Req() req,
   ) {
     return this.estimatesService.sendViaWhatsApp(
@@ -81,9 +78,7 @@ export class PublicEstimatesController {
   @Public()
   @Get('share/:token')
   async getSharedPdf(@Param('token') token: string, @Res() res: Response) {
-    if (!token) {
-      return res.status(400).send('Token não fornecido');
-    }
+    if (!token) return res.status(400).send('Token não fornecido');
 
     try {
       const pdfBuffer = await this.estimatesService.getPdfByShareToken(token);

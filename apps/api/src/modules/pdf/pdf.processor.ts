@@ -19,7 +19,7 @@ export class PdfProcessor extends WorkerHost {
 
   async process(job: Job<{ tenantId: string; entityId: number; entityType: string; data: any }>): Promise<any> {
     const { tenantId, entityId, entityType, data } = job.data;
-    this.logger.log(`Gerando PDF para ${entityType} ID ${entityId}`);
+    this.logger.log(`Gerando PDF para ${entityType} ${entityId}`);
 
     try {
       const pdfBuffer = await this.pdfService.generateFromData(data);
@@ -38,7 +38,7 @@ export class PdfProcessor extends WorkerHost {
       this.logger.log(`PDF salvo em ${url}`);
       return { url };
     } catch (error) {
-      this.logger.error(`Erro: ${error.message}`);
+      this.logger.error(`Erro ao gerar PDF para ${entityType} ${entityId}: ${error.message}`);
       await this.prisma[entityType].update({
         where: { id: entityId, tenantId },
         data: { pdfStatus: 'failed' },

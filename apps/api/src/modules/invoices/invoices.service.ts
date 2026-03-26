@@ -12,6 +12,8 @@ import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { ConfigService } from '@nestjs/config';
 import { StorageService } from '../storage/storage.service';
 import { InvoicesPdfService } from './invoices-pdf.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class InvoicesService {
@@ -23,6 +25,7 @@ export class InvoicesService {
     private configService: ConfigService,
     private storageService: StorageService,
     private invoicesPdfService: InvoicesPdfService,
+    @InjectQueue('pdf') private pdfQueue: Queue,
   ) {}
 
   async create(tenantId: string, data: any) {
@@ -220,8 +223,8 @@ export class InvoicesService {
   async sendViaWhatsApp(
     id: number,
     tenantId: string,
-    workshopData?: any, // dados da oficina vindos do frontend
-  ): Promise<{ whatsappLink: string; message: string; pdfUrl: string }> {
+    workshopData?: any,
+  ): Promise<{ whatsappLink?: string; message: string; pdfUrl?: string; queued?: boolean }> {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, tenantId },
       include: { client: true, items: true, tenant: true },
@@ -240,35 +243,67 @@ export class InvoicesService {
       return { whatsappLink, message, pdfUrl };
     }
 
-    // Dados efetivos da oficina: prioriza workshopData (frontend) e completa com tenant
+    const tenant = invoice.tenant;
     const effectiveTenant = workshopData
       ? {
-          ...invoice.tenant,
-          name: workshopData.name || invoice.tenant.name,
-          documentNumber: workshopData.documentNumber || invoice.tenant.documentNumber,
-          phone: workshopData.phone || invoice.tenant.phone,
-          email: workshopData.email || invoice.tenant.email,
-          logoUrl: workshopData.logoUrl || invoice.tenant.logoUrl,
+          ...tenant,
+          name: workshopData.name || tenant.name,
+          documentNumber: workshopData.documentNumber || tenant.documentNumber,
+          phone: workshopData.phone || tenant.phone,
+          email: workshopData.email || tenant.email,
+          logoUrl: workshopData.logoUrl || tenant.logoUrl,
         }
-      : invoice.tenant;
+      : tenant;
 
-    this.logger.log(`Gerando PDF síncrono para fatura ${id} usando dados ${workshopData ? 'do frontend' : 'do tenant'}`);
-    const pdfBuffer = await this.invoicesPdfService.generateInvoicePdf(invoice, effectiveTenant);
-    const key = `${tenantId}/invoices/${id}.pdf`;
-    const url = await this.storageService.upload(pdfBuffer, key);
+    const invoiceData = {
+      logoUrl: effectiveTenant.logoUrl,
+      invoiceNumber: invoice.number,
+      client: {
+        name: client.name,
+        document: client.document || 'Não informado',
+        address: client.address || '',
+        phone: client.phone,
+        vehicle: client.vehicle,
+        plate: client.plate,
+      },
+      issueDate: new Date(invoice.createdAt).toLocaleDateString('pt-BR'),
+      dueDate: '',
+      status: this.getStatusText(invoice.status),
+      items: invoice.items.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.price.toFixed(2),
+        total: (item.price * item.quantity + (item.issPercent ? item.price * item.quantity * (item.issPercent / 100) : 0)).toFixed(2),
+      })),
+      subtotal: invoice.items.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2),
+      issRate: 0,
+      issValue: invoice.items.reduce((acc, item) => {
+        const iss = item.issPercent ? item.price * item.quantity * (item.issPercent / 100) : 0;
+        return acc + iss;
+      }, 0).toFixed(2),
+      total: invoice.total.toFixed(2),
+      companyName: effectiveTenant.name || 'Oficina',
+      companyDocument: effectiveTenant.documentNumber || '',
+      companyPhone: effectiveTenant.phone || '',
+      companyEmail: effectiveTenant.email || '',
+    };
+
+    await this.pdfQueue.add('generate', {
+      tenantId,
+      entityId: id,
+      entityType: 'invoice',
+      data: invoiceData,
+    });
 
     await this.prisma.invoice.update({
       where: { id, tenantId },
-      data: {
-        pdfUrl: url,
-        pdfStatus: 'generated',
-        pdfGeneratedAt: new Date(),
-      },
+      data: { pdfStatus: 'pending' },
     });
 
-    const message = this.buildWhatsAppMessage(invoice, url);
-    const whatsappLink = this.whatsappService.generateWhatsAppLink(client.phone, message);
-    return { whatsappLink, message, pdfUrl: url };
+    return {
+      message: 'PDF em processamento. O link será enviado em breve.',
+      queued: true,
+    };
   }
 
   private buildWhatsAppMessage(invoice: any, pdfUrl: string): string {
