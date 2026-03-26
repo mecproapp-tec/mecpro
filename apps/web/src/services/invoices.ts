@@ -1,33 +1,43 @@
-import api from './api';
+import api from "./api";
 
 export interface InvoiceItem {
+  id: number;
   description: string;
   quantity: number;
   price: number;
   total: number;
-  issPercent?: number; // opcional
+  issPercent?: number;
 }
 
 export interface Invoice {
   id: number;
-  tenantId: string;
   clientId: number;
-  estimateId?: number;
-  total: number;
   number: string;
+  total: number;
   status: "PENDING" | "PAID" | "CANCELED";
+  pdfUrl?: string;
+  pdfStatus?: string;
+  pdfGeneratedAt?: string;
   createdAt: string;
+  updatedAt?: string;
+  shareToken?: string;
+  shareTokenExpires?: string;
   items: InvoiceItem[];
   client?: {
+    id: number;
     name: string;
-    plate?: string;
+    phone: string;
+    vehicle: string;
+    plate: string;
+    address?: string;
+    document?: string;
   };
 }
 
 export interface CreateInvoiceData {
   clientId: number;
   estimateId?: number;
-  items: InvoiceItem[];
+  items: Omit<InvoiceItem, "id" | "total">[];
   status?: "PENDING" | "PAID" | "CANCELED";
 }
 
@@ -63,7 +73,6 @@ export const deleteInvoice = async (id: number): Promise<void> => {
   await api.delete(`/invoices/${id}`);
 };
 
-// Função para calcular total com ISS (usada no PDF e onde mais precisar)
 export function calculateTotalWithIss(items: InvoiceItem[]): number {
   return items.reduce((acc, item) => {
     const itemTotal = item.price * item.quantity;

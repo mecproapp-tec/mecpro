@@ -233,7 +233,7 @@ Seu orçamento está pronto ✅
             <p><strong>Status:</strong> ${getStatusLabel(orcamento.status)}</p>
             <div class="details">
               <h3>Itens</h3>
-               <table>
+              <table>
                 <thead>
                   <tr>
                     <th>Descrição</th>
@@ -284,93 +284,118 @@ Seu orçamento está pronto ✅
     .filter(o => o.status !== "converted")
     .reduce((acc, o) => acc + o.total, 0);
 
-  if (loading) return <div style={styles.loadingContainer}><div style={styles.loading}>Carregando orçamentos...</div></div>;
-  if (error) return <div style={styles.errorContainer}><div style={styles.error}>{error}</div></div>;
+  if (loading) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loading}>Carregando orçamentos...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.errorContainer}>
+        <div style={styles.error}>{error}</div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)", minHeight: "100vh", padding: "48px 24px", color: "#e0e0e0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-      <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "40px", flexWrap: "wrap", gap: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <button onClick={() => navigate("/home")} style={{ background: "#1a1a1a", border: "none", color: "#00e5ff", width: "48px", height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "24px", transition: "all 0.2s", boxShadow: "0 4px 12px rgba(0, 229, 255, 0.2)" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#2a2a2a")} onMouseLeave={(e) => (e.currentTarget.style.background = "#1a1a1a")}>
+    <div style={styles.container}>
+      <div style={styles.innerContainer}>
+        <div style={styles.header}>
+          <div style={styles.headerLeft}>
+            <button onClick={() => navigate("/home")} style={styles.backButton}>
               <FiArrowLeft />
             </button>
-            <h1 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: "700", background: "linear-gradient(135deg, #00e5ff, #7fdbff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", margin: 0, letterSpacing: "-0.02em" }}>Orçamentos</h1>
+            <h1 style={styles.title}>Orçamentos</h1>
           </div>
-          <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-            <div style={{ background: "#1a1a1a", padding: "12px 24px", borderRadius: "100px", fontWeight: "600", fontSize: "1.1rem", color: "#00e5ff", border: "1px solid #00e5ff30", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)" }}>
-              Total: <span style={{ color: "#ffffff", marginLeft: "8px" }}>R$ {totalGeral.toFixed(2)}</span>
+          <div style={styles.headerRight}>
+            <div style={styles.totalBox}>
+              Total: <span style={styles.totalValue}>R$ {totalGeral.toFixed(2)}</span>
             </div>
-            <button onClick={() => navigate("/orcamentos/novo")} style={{ background: "linear-gradient(135deg, #00e5ff, #0077ff)", color: "#000", padding: "12px 24px", borderRadius: "100px", fontWeight: "600", fontSize: "1rem", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s", boxShadow: "0 8px 20px rgba(0, 229, 255, 0.3)" }} onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")} onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}>
+            <button onClick={() => navigate("/orcamentos/novo")} style={styles.newButton}>
               <FiPlus size={20} /> Novo Orçamento
             </button>
           </div>
         </div>
 
-        {/* Filtros */}
-        <div style={{ display: "flex", gap: "12px", marginBottom: "32px", flexWrap: "wrap" }}>
+        <div style={styles.filters}>
           {[
             { key: "todos", label: "Todos" },
             { key: "accepted", label: "Aceito" },
             { key: "pending", label: "Pendente" },
             { key: "converted", label: "Convertido" },
           ].map((f) => (
-            <button key={f.key} onClick={() => setFiltro(f.key as FilterType)} style={{ padding: "10px 24px", borderRadius: "100px", background: filtro === f.key ? "#00e5ff" : "transparent", color: filtro === f.key ? "#000" : "#00e5ff", border: filtro === f.key ? "none" : "1px solid #00e5ff40", cursor: "pointer", fontWeight: "600", fontSize: "0.95rem", transition: "all 0.2s", boxShadow: filtro === f.key ? "0 4px 12px rgba(0, 229, 255, 0.4)" : "none" }} onMouseEnter={(e) => { if (filtro !== f.key) e.currentTarget.style.background = "#00e5ff10"; }} onMouseLeave={(e) => { if (filtro !== f.key) e.currentTarget.style.background = "transparent"; }}>
+            <button
+              key={f.key}
+              onClick={() => setFiltro(f.key as FilterType)}
+              style={{
+                ...styles.filterButton,
+                background: filtro === f.key ? "#00e5ff" : "transparent",
+                color: filtro === f.key ? "#000" : "#00e5ff",
+                border: filtro === f.key ? "none" : "1px solid #00e5ff40",
+                boxShadow: filtro === f.key ? "0 4px 12px rgba(0, 229, 255, 0.4)" : "none",
+              }}
+            >
               {f.label}
             </button>
           ))}
         </div>
 
-        {/* Tabela */}
-        <div style={{ background: "#111", borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px #00e5ff20" }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
+        <div style={styles.tableContainer}>
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
               <thead>
-                <tr style={{ background: "#1e1e1e", borderBottom: "2px solid #00e5ff30" }}>
-                  <th style={{ padding: "20px 16px", textAlign: "left", fontWeight: "600", color: "#a0a0a0" }}>Cliente</th>
-                  <th style={{ padding: "20px 16px", textAlign: "left", fontWeight: "600", color: "#a0a0a0" }}>Veículo</th>
-                  <th style={{ padding: "20px 16px", textAlign: "left", fontWeight: "600", color: "#a0a0a0" }}>Placa</th>
-                  <th style={{ padding: "20px 16px", textAlign: "left", fontWeight: "600", color: "#a0a0a0" }}>Data</th>
-                  <th style={{ padding: "20px 16px", textAlign: "right", fontWeight: "600", color: "#a0a0a0" }}>Total (R$)</th>
-                  <th style={{ padding: "20px 16px", textAlign: "left", fontWeight: "600", color: "#a0a0a0" }}>Status</th>
-                  <th style={{ padding: "20px 16px", textAlign: "center", fontWeight: "600", color: "#a0a0a0" }}>Ações</th>
+                <tr style={styles.tableHeader}>
+                  <th style={styles.th}>Cliente</th>
+                  <th style={styles.th}>Veículo</th>
+                  <th style={styles.th}>Placa</th>
+                  <th style={styles.th}>Data</th>
+                  <th style={styles.th}>Total (R$)</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {orcamentosFiltrados.map((o, index) => {
                   const cliente = o.client;
                   return (
-                    <tr key={o.id} style={{ borderBottom: "1px solid #2a2a2a", transition: "background 0.2s", background: index % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#2a2a2a")} onMouseLeave={(e) => (e.currentTarget.style.background = index % 2 === 0 ? "#0f0f0f" : "#1a1a1a")}>
-                      <td style={{ padding: "18px 16px", fontWeight: "500", color: "#fff" }}>{cliente?.name || "Cliente não encontrado"}</td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{cliente ? getVehicleDisplay(cliente) : "Não informado"}</td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{cliente?.plate || ""}</td>
-                      <td style={{ padding: "18px 16px", color: "#b0b0b0" }}>{new Date(o.date).toLocaleDateString("pt-BR")}</td>
-                      <td style={{ padding: "18px 16px", textAlign: "right", fontWeight: "600", color: "#00e5ff" }}>R$ {o.total.toFixed(2)}</td>
-                      <td style={{ padding: "18px 16px" }}>
+                    <tr key={o.id} style={{ ...styles.tableRow, background: index % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }}>
+                      <td style={styles.td}>{cliente?.name || "Cliente não encontrado"}</td>
+                      <td style={styles.td}>{cliente ? getVehicleDisplay(cliente) : "Não informado"}</td>
+                      <td style={styles.td}>{cliente?.plate || ""}</td>
+                      <td style={styles.td}>{new Date(o.date).toLocaleDateString("pt-BR")}</td>
+                      <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>R$ {o.total.toFixed(2)}</td>
+                      <td style={styles.td}>
                         {o.status === "converted" ? (
-                          <span style={{ background: "#2a2a2a", color: "#ffaa00", padding: "6px 14px", borderRadius: "100px", fontWeight: "600", fontSize: "0.85rem", display: "inline-block", border: "1px solid #ffaa0040" }}>{getStatusLabel(o.status)}</span>
+                          <span style={styles.convertedStatus}>{getStatusLabel(o.status)}</span>
                         ) : (
-                          <select value={o.status} onChange={(e) => handleStatusChange(o, e.target.value as "accepted" | "pending")} style={{ background: "#1a1a1a", color: "#00e5ff", border: "1px solid #00e5ff40", padding: "8px 12px", borderRadius: "100px", cursor: "pointer", fontWeight: "500", fontSize: "0.85rem", outline: "none" }}>
+                          <select
+                            value={o.status}
+                            onChange={(e) => handleStatusChange(o, e.target.value as "accepted" | "pending")}
+                            style={styles.statusSelect}
+                          >
                             <option value="accepted">Aceito</option>
                             <option value="pending">Pendente</option>
                           </select>
                         )}
                       </td>
-                      <td style={{ padding: "18px 16px", textAlign: "center" }}>
-                        <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                      <td style={{ ...styles.td, textAlign: "center" }}>
+                        <div style={styles.actions}>
                           {o.status === "converted" ? (
                             <>
-                              <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={{ ...botaoStyle, color: "#00e5ff", borderColor: "#00e5ff30" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#00e5ff20"; e.currentTarget.style.borderColor = "#00e5ff"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#00e5ff30"; }} title="Ver cliente"><FiEye size={16} /></button>
-                              <button onClick={() => handleExcluir(o.id)} style={{ ...botaoStyle, color: "#ff5555", borderColor: "#ff555530" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#ff555520"; e.currentTarget.style.borderColor = "#ff5555"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#ff555530"; }} title="Excluir"><FiTrash2 size={16} /></button>
+                              <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={styles.actionButton} title="Ver cliente"><FiEye size={16} /></button>
+                              <button onClick={() => handleExcluir(o.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir"><FiTrash2 size={16} /></button>
                             </>
                           ) : (
                             <>
-                              <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={{ ...botaoStyle, color: "#00e5ff", borderColor: "#00e5ff30" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#00e5ff20"; e.currentTarget.style.borderColor = "#00e5ff"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#00e5ff30"; }} title="Ver cliente"><FiEye size={16} /></button>
-                              <button onClick={() => navigate(`/orcamentos/editar/${o.id}`)} style={{ ...botaoStyle, color: "#00e5ff", borderColor: "#00e5ff30" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#00e5ff20"; e.currentTarget.style.borderColor = "#00e5ff"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#00e5ff30"; }} title="Editar orçamento"><FiEdit size={16} /></button>
-                              <button onClick={() => handleExcluir(o.id)} style={{ ...botaoStyle, color: "#ff5555", borderColor: "#ff555530" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#ff555520"; e.currentTarget.style.borderColor = "#ff5555"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#ff555530"; }} title="Excluir"><FiTrash2 size={16} /></button>
-                              <button onClick={() => handleConverter(o)} style={{ ...botaoStyle, color: "#ffcc00", borderColor: "#ffcc0030" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#ffcc0020"; e.currentTarget.style.borderColor = "#ffcc00"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#ffcc0030"; }} title="Converter em Fatura"><FiRefreshCw size={16} /></button>
-                              <button onClick={() => handlePDF(o)} style={{ ...botaoStyle, color: "#00e5ff", borderColor: "#00e5ff30" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#00e5ff20"; e.currentTarget.style.borderColor = "#00e5ff"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#00e5ff30"; }} title="Gerar PDF"><FiFileText size={16} /></button>
-                              <button onClick={() => handleWhatsApp(o)} style={{ ...botaoStyle, color: "#25D366", borderColor: "#25D36630" }} onMouseEnter={(e) => { e.currentTarget.style.background = "#25D36620"; e.currentTarget.style.borderColor = "#25D366"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "#1a1a1a"; e.currentTarget.style.borderColor = "#25D36630"; }} title="Enviar WhatsApp"><FiMessageCircle size={16} /></button>
+                              <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={styles.actionButton} title="Ver cliente"><FiEye size={16} /></button>
+                              <button onClick={() => navigate(`/orcamentos/editar/${o.id}`)} style={styles.actionButton} title="Editar orçamento"><FiEdit size={16} /></button>
+                              <button onClick={() => handleExcluir(o.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir"><FiTrash2 size={16} /></button>
+                              <button onClick={() => handleConverter(o)} style={{ ...styles.actionButton, color: "#ffcc00", borderColor: "#ffcc0030" }} title="Converter em Fatura"><FiRefreshCw size={16} /></button>
+                              <button onClick={() => handlePDF(o)} style={styles.actionButton} title="Gerar PDF"><FiFileText size={16} /></button>
+                              <button onClick={() => handleWhatsApp(o)} style={{ ...styles.actionButton, color: "#25D366", borderColor: "#25D36630" }} title="Enviar WhatsApp"><FiMessageCircle size={16} /></button>
                             </>
                           )}
                         </div>
@@ -379,7 +404,9 @@ Seu orçamento está pronto ✅
                   );
                 })}
                 {orcamentosFiltrados.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: "60px 16px", textAlign: "center", color: "#888", fontStyle: "italic" }}>Nenhum orçamento encontrado.</td></tr>
+                  <tr>
+                    <td colSpan={7} style={styles.emptyRow}>Nenhum orçamento encontrado.</td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -391,8 +418,199 @@ Seu orçamento está pronto ✅
 }
 
 const styles = {
-  loadingContainer: { background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" },
-  loading: { color: "#00e5ff", fontSize: "18px" },
-  errorContainer: { background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" },
-  error: { color: "#ff4444", fontSize: "18px" },
+  container: {
+    background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)",
+    minHeight: "100vh",
+    padding: "48px 24px",
+    color: "#e0e0e0",
+    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+  },
+  innerContainer: {
+    maxWidth: "1280px",
+    margin: "0 auto",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "40px",
+    flexWrap: "wrap",
+    gap: "20px",
+  },
+  headerLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+  backButton: {
+    background: "#1a1a1a",
+    border: "none",
+    color: "#00e5ff",
+    width: "48px",
+    height: "48px",
+    borderRadius: "12px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    fontSize: "24px",
+    transition: "all 0.2s",
+    boxShadow: "0 4px 12px rgba(0, 229, 255, 0.2)",
+  },
+  title: {
+    fontSize: "clamp(32px, 5vw, 48px)",
+    fontWeight: "700",
+    background: "linear-gradient(135deg, #00e5ff, #7fdbff)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    margin: 0,
+    letterSpacing: "-0.02em",
+  },
+  headerRight: {
+    display: "flex",
+    gap: "16px",
+    alignItems: "center",
+  },
+  totalBox: {
+    background: "#1a1a1a",
+    padding: "12px 24px",
+    borderRadius: "100px",
+    fontWeight: "600",
+    fontSize: "1.1rem",
+    color: "#00e5ff",
+    border: "1px solid #00e5ff30",
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)",
+  },
+  totalValue: {
+    color: "#ffffff",
+    marginLeft: "8px",
+  },
+  newButton: {
+    background: "linear-gradient(135deg, #00e5ff, #0077ff)",
+    color: "#000",
+    padding: "12px 24px",
+    borderRadius: "100px",
+    fontWeight: "600",
+    fontSize: "1rem",
+    border: "none",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "all 0.2s",
+    boxShadow: "0 8px 20px rgba(0, 229, 255, 0.3)",
+  },
+  filters: {
+    display: "flex",
+    gap: "12px",
+    marginBottom: "32px",
+    flexWrap: "wrap",
+  },
+  filterButton: {
+    padding: "10px 24px",
+    borderRadius: "100px",
+    cursor: "pointer",
+    fontWeight: "600",
+    fontSize: "0.95rem",
+    transition: "all 0.2s",
+  },
+  tableContainer: {
+    background: "#111",
+    borderRadius: "24px",
+    overflow: "hidden",
+    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px #00e5ff20",
+  },
+  tableWrapper: {
+    overflowX: "auto",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    minWidth: "900px",
+  },
+  tableHeader: {
+    background: "#1e1e1e",
+    borderBottom: "2px solid #00e5ff30",
+  },
+  th: {
+    padding: "20px 16px",
+    textAlign: "left",
+    fontWeight: "600",
+    color: "#a0a0a0",
+  },
+  tableRow: {
+    borderBottom: "1px solid #2a2a2a",
+    transition: "background 0.2s",
+  },
+  td: {
+    padding: "18px 16px",
+    color: "#b0b0b0",
+  },
+  convertedStatus: {
+    background: "#2a2a2a",
+    color: "#ffaa00",
+    padding: "6px 14px",
+    borderRadius: "100px",
+    fontWeight: "600",
+    fontSize: "0.85rem",
+    display: "inline-block",
+    border: "1px solid #ffaa0040",
+  },
+  statusSelect: {
+    background: "#1a1a1a",
+    color: "#00e5ff",
+    border: "1px solid #00e5ff40",
+    padding: "8px 12px",
+    borderRadius: "100px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "0.85rem",
+    outline: "none",
+  },
+  actions: {
+    display: "flex",
+    gap: "12px",
+    justifyContent: "center",
+  },
+  actionButton: {
+    background: "#1a1a1a",
+    border: "1px solid #00e5ff30",
+    width: "36px",
+    height: "36px",
+    borderRadius: "10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    color: "#00e5ff",
+  },
+  emptyRow: {
+    padding: "60px 16px",
+    textAlign: "center",
+    color: "#888",
+    fontStyle: "italic",
+  },
+  loadingContainer: {
+    background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)",
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loading: {
+    color: "#00e5ff",
+    fontSize: "18px",
+  },
+  errorContainer: {
+    background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)",
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  error: {
+    color: "#ff4444",
+    fontSize: "18px",
+  },
 };

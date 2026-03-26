@@ -1,40 +1,53 @@
 import api from "./api";
 
 export interface EstimateItem {
+  id: number;
   description: string;
+  quantity: number;
   price: number;
+  total: number;
   issPercent?: number;
 }
 
 export interface Estimate {
   id: number;
   clientId: number;
-  clientName?: string;
-  plate?: string;
   date: string;
   total: number;
   status: "pending" | "accepted" | "converted";
-  items: EstimateItem[];
+  pdfUrl?: string;
+  pdfStatus?: string;
+  pdfGeneratedAt?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  shareToken?: string;
+  shareTokenExpires?: string;
+  items: EstimateItem[];
+  client?: {
+    id: number;
+    name: string;
+    phone: string;
+    vehicle: string;
+    plate: string;
+    address?: string;
+    document?: string;
+  };
 }
 
 export interface CreateEstimateData {
   clientId: number;
   date: string;
-  items: EstimateItem[];
-  status?: string; // para update
+  items: Omit<EstimateItem, "id" | "total">[];
+  status?: string;
 }
 
-// Mapeamento de status frontend -> backend
-const statusToBackend = {
+const statusToBackend: Record<string, string> = {
   pending: "DRAFT",
   accepted: "APPROVED",
   converted: "CONVERTED",
 };
 
-// Mapeamento backend -> frontend
-const statusToFrontend = {
+const statusToFrontend: Record<string, string> = {
   DRAFT: "pending",
   APPROVED: "accepted",
   CONVERTED: "converted",
@@ -76,14 +89,11 @@ export const createEstimate = async (data: CreateEstimateData): Promise<Estimate
 };
 
 export const updateEstimate = async (id: number, data: CreateEstimateData): Promise<Estimate> => {
-  // Converte status para o formato do backend
   const payload = {
     ...data,
     status: data.status ? statusToBackend[data.status] || data.status : undefined,
   };
-  console.log("Enviando update com payload:", payload);
   const response = await api.put(`/estimates/${id}`, payload);
-  console.log("Resposta do update:", response.data);
   const est = response.data;
   return {
     ...est,
@@ -97,7 +107,8 @@ export const deleteEstimate = async (id: number): Promise<void> => {
 
 export function calculateTotalWithIss(items: EstimateItem[]): number {
   return items.reduce((acc, item) => {
-    const iss = item.issPercent ? item.price * (item.issPercent / 100) : 0;
-    return acc + item.price + iss;
+    const itemTotal = item.price * item.quantity;
+    const iss = item.issPercent ? itemTotal * (item.issPercent / 100) : 0;
+    return acc + itemTotal + iss;
   }, 0);
 }
