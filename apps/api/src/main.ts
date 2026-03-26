@@ -4,6 +4,11 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 
 async function bootstrap() {
+  console.log('🚀 Iniciando aplicação...');
+  console.log(`📦 NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`🔍 PORT env: ${process.env.PORT}`);
+  console.log(`🔍 APP_URL env: ${process.env.APP_URL}`);
+
   const app = await NestFactory.create(AppModule);
 
   // Desativa políticas que bloqueiam CORS
@@ -59,8 +64,19 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   app.setGlobalPrefix('api');
 
+  // Adiciona um endpoint de saúde simples
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   const port = process.env.PORT || 3000;
-  await app.listen(port, '0.0.0.0');
+  const host = '0.0.0.0';
+
+  const server = await app.listen(port, host);
+  const address = server.address();
+  console.log(`✅ Servidor ouvindo em http://${host}:${port}`);
+  console.log(`📡 Endereço real: ${JSON.stringify(address)}`);
   console.log(`🚀 API rodando em ${process.env.APP_URL || `http://localhost:${port}`}`);
 }
 bootstrap();
