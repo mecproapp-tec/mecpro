@@ -92,13 +92,36 @@ export class InvoicesPdfService {
       const html = template(data);
       this.logger.debug(`HTML gerado, tamanho: ${html.length}`);
 
+      // Opcional: salvar o HTML em arquivo para inspeção (remover em produção)
+      // const fs = require('fs');
+      // fs.writeFileSync('/tmp/invoice.html', html);
+      // this.logger.log(`HTML salvo em /tmp/invoice.html`);
+
       const browser = await this.browserPool.getBrowser();
       const page = await browser.newPage();
 
-      // Adicione um timeout maior e capture erros de conteúdo
-      await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+      // Evita carregamento de recursos externos (imagens, fontes) que podem travar
+      await page.setRequestInterception(true);
+      page.on('request', (request) => {
+        if (request.resourceType() === 'image' || request.resourceType() === 'font') {
+          request.abort();
+        } else {
+          request.continue();
+        }
+      });
 
-      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+      // Configuração mais tolerante
+      await page.setContent(html, {
+        waitUntil: 'load', // 'networkidle0' pode esperar para sempre
+        timeout: 60000,
+      });
+
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        timeout: 60000,
+      });
+
       await page.close();
 
       this.logger.log(`PDF gerado com sucesso, tamanho: ${pdfBuffer.length} bytes`);
