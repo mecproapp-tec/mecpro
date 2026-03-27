@@ -195,7 +195,7 @@ model Appointment {
   comment       String?
   date          DateTime
   id            Int            @id @default(autoincrement())
-  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   notifications Notification[]
 
@@ -216,7 +216,7 @@ model Estimate {
   date              DateTime
   shareToken        String?        @unique
   shareTokenExpires DateTime?
-  client            Client         @relation(fields: [clientId], references: [id])
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
   tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             EstimateItem[]
   invoice           Invoice?
@@ -274,7 +274,7 @@ model Invoice {
   estimateId        Int?          @unique
   shareToken        String?       @unique
   shareTokenExpires DateTime?
-  client            Client        @relation(fields: [clientId], references: [id])
+  client            Client        @relation(fields: [clientId], references: [id], onDelete: Restrict)
   estimate          Estimate?     @relation(fields: [estimateId], references: [id])
   tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             InvoiceItem[]

@@ -74,6 +74,7 @@ export class InvoicesService {
       where: { tenantId },
       select: {
         id: true,
+        clientId: true,
         number: true,
         total: true,
         status: true,
@@ -111,6 +112,7 @@ export class InvoicesService {
       where: { id, tenantId },
       select: {
         id: true,
+        clientId: true,
         number: true,
         total: true,
         status: true,

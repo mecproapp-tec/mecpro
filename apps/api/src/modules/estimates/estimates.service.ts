@@ -71,6 +71,7 @@ export class EstimatesService {
       where: { tenantId },
       select: {
         id: true,
+        clientId: true,
         date: true,
         total: true,
         status: true,
@@ -108,6 +109,7 @@ export class EstimatesService {
       where: { id, tenantId },
       select: {
         id: true,
+        clientId: true,
         date: true,
         total: true,
         status: true,
