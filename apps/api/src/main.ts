@@ -28,16 +28,19 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+  if (allowedOrigins.length === 0) {
+    console.warn('⚠️  ALLOWED_ORIGINS não configurada – CORS permitirá localhost apenas.');
+  }
+  const devOrigins = ['http://localhost:5173', 'http://localhost:3000'];
+
   app.enableCors({
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'https://mecpro.tec.br',
-        'https://www.mecpro.tec.br',
-        'https://mec-pro.vercel.app',
-        'http://localhost:5173',
-        'http://localhost:3000',
-      ];
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || devOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -47,26 +50,6 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
     optionsSuccessStatus: 200,
-  });
-
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    const allowed = [
-      'https://mecpro.tec.br',
-      'https://www.mecpro.tec.br',
-      'https://mec-pro.vercel.app',
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ];
-    if (origin && allowed.includes(origin)) {
-      res.header('Access-Control-Allow-Origin', origin);
-      res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    }
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
   });
 
   app.useGlobalPipes(
