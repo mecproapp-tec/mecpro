@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FiTrash2, FiPlus, FiArrowLeft, FiFileText, FiMessageCircle, FiEye } from "react-icons/fi";
 import { getInvoices, deleteInvoice, updateInvoice, calculateTotalWithIss } from "../../../services/invoices";
 import type { Invoice } from "../../../services/invoices";
-import { getVehicleDisplay } from "../../../services/clients";
+import { getClientById, getVehicleDisplay, type Client } from "../../../services/clients";
 import api from "../../../services/api";
 
 type FilterType = "todos" | "PENDING" | "PAID" | "CANCELED";
@@ -15,19 +15,6 @@ export default function Faturas() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const botaoStyle = {
-    background: "#1a1a1a",
-    border: "1px solid",
-    width: "36px",
-    height: "36px",
-    borderRadius: "10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    transition: "all 0.2s",
-  };
-
   useEffect(() => {
     carregarDados();
   }, []);
@@ -37,6 +24,7 @@ export default function Faturas() {
     try {
       const invoicesData = await getInvoices();
       setFaturas(invoicesData);
+      await carregarClientesFaltantes(invoicesData);
     } catch (err: any) {
       setError(err.response?.data?.message || "Erro ao carregar faturas");
     } finally {
@@ -44,10 +32,37 @@ export default function Faturas() {
     }
   };
 
+  const carregarClientesFaltantes = async (invoices: Invoice[]) => {
+    const missingClientIds = invoices
+      .filter(inv => !inv.client && typeof inv.clientId === 'number' && inv.clientId > 0)
+      .map(inv => inv.clientId)
+      .filter((id, index, self) => self.indexOf(id) === index);
+
+    if (missingClientIds.length === 0) return;
+
+    const clientMap = new Map<number, Client>();
+    await Promise.all(
+      missingClientIds.map(async (id) => {
+        try {
+          const client = await getClientById(id);
+          if (client) clientMap.set(id, client);
+        } catch (err) {
+          console.warn(`Cliente ${id} não encontrado ou erro ao buscar`);
+        }
+      })
+    );
+
+    setFaturas(prev =>
+      prev.map(inv => ({
+        ...inv,
+        client: inv.client || clientMap.get(inv.clientId) || undefined,
+      }))
+    );
+  };
+
   const handleExcluir = async (id: number) => {
     const confirmar = confirm("Tem certeza que deseja excluir esta fatura?");
     if (!confirmar) return;
-
     try {
       await deleteInvoice(id);
       setFaturas(faturas.filter((f) => f.id !== id));
@@ -57,6 +72,11 @@ export default function Faturas() {
   };
 
   const handleStatusChange = async (fatura: Invoice, novoStatus: string) => {
+    if (!fatura.clientId || typeof fatura.clientId !== 'number' || fatura.clientId <= 0) {
+      alert("Esta fatura não possui um cliente válido. Corrija antes de alterar o status.");
+      return;
+    }
+
     try {
       await updateInvoice(fatura.id, {
         clientId: fatura.clientId,
@@ -71,33 +91,20 @@ export default function Faturas() {
 
   const handleWhatsApp = async (fatura: Invoice) => {
     const cliente = fatura.client;
-    if (!cliente) {
-      alert("Cliente não encontrado");
+    if (!cliente || !cliente.phone) {
+      alert("Cliente não encontrado ou sem telefone");
       return;
     }
-
     let telefone = cliente.phone.replace(/\D/g, "");
     if (telefone.length === 10 || telefone.length === 11) {
       telefone = "55" + telefone;
     }
-
     try {
       const response = await api.post(`/invoices/${fatura.id}/share`);
       const { url: link } = response.data;
-
       const vehicleDisplay = getVehicleDisplay(cliente);
-
       const mensagem = encodeURIComponent(
-        `${link}
-
-Olá ${cliente.name}!
-
-Sua fatura ${fatura.number} está disponível ✅
-
-👤 Cliente: ${cliente.name}
-🚗 Veículo: ${vehicleDisplay}
-💰 Total: R$ ${fatura.total.toFixed(2)}
-📌 Status: ${
+        `${link}\n\nOlá ${cliente.name}!\n\nSua fatura ${fatura.number} está disponível ✅\n\n👤 Cliente: ${cliente.name}\n🚗 Veículo: ${vehicleDisplay}\n💰 Total: R$ ${fatura.total.toFixed(2)}\n📌 Status: ${
           fatura.status === "PAID"
             ? "Paga"
             : fatura.status === "PENDING"
@@ -105,7 +112,6 @@ Sua fatura ${fatura.number} está disponível ✅
             : "Cancelada"
         }`
       );
-
       window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
     } catch (error) {
       console.error("Erro ao gerar link da fatura:", error);
@@ -117,7 +123,6 @@ Sua fatura ${fatura.number} está disponível ✅
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
     const totalComIss = calculateTotalWithIss(fatura.items);
     const cliente = fatura.client;
-
     const win = window.open("", "_blank");
     if (win) {
       win.document.write(`
@@ -313,10 +318,34 @@ Sua fatura ${fatura.number} está disponível ✅
                       </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
-                          <button onClick={() => navigate(`/clientes/ver/${f.clientId}`)} style={styles.actionButton} title="Ver cliente"><FiEye size={16} /></button>
-                          <button onClick={() => handleExcluir(f.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir"><FiTrash2 size={16} /></button>
-                          <button onClick={() => handlePDF(f)} style={styles.actionButton} title="Gerar PDF"><FiFileText size={16} /></button>
-                          <button onClick={() => handleWhatsApp(f)} style={{ ...styles.actionButton, color: "#25D366", borderColor: "#25D36630" }} title="Enviar WhatsApp"><FiMessageCircle size={16} /></button>
+                          <button
+                            onClick={() => navigate(`/clientes/ver/${f.clientId}`)}
+                            style={styles.actionButton}
+                            title="Ver cliente"
+                          >
+                            <FiEye size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleExcluir(f.id)}
+                            style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }}
+                            title="Excluir"
+                          >
+                            <FiTrash2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handlePDF(f)}
+                            style={styles.actionButton}
+                            title="Gerar PDF"
+                          >
+                            <FiFileText size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleWhatsApp(f)}
+                            style={{ ...styles.actionButton, color: "#25D366", borderColor: "#25D36630" }}
+                            title="Enviar WhatsApp"
+                          >
+                            <FiMessageCircle size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>

@@ -12,7 +12,7 @@ import {
 } from "react-icons/fi";
 import { getEstimates, deleteEstimate, updateEstimate } from "../../../services/Estimates";
 import { createInvoice } from "../../../services/invoices";
-import { getVehicleDisplay } from "../../../services/clients";
+import { getClientById, getVehicleDisplay, type Client } from "../../../services/clients";
 import type { Estimate } from "../../../services/Estimates";
 import api from "../../../services/api";
 
@@ -50,23 +50,6 @@ export default function Orcamentos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const botaoStyle = {
-    background: "#1a1a1a",
-    border: "1px solid",
-    width: "36px",
-    height: "36px",
-    borderRadius: "10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    transition: "all 0.2s",
-  };
-
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
   const carregarDados = async () => {
     setLoading(true);
     try {
@@ -76,6 +59,7 @@ export default function Orcamentos() {
         status: reverseStatusMap[est.status] || est.status,
       }));
       setOrcamentos(convertedEstimates);
+      await carregarClientesFaltantes(convertedEstimates);
     } catch (err: any) {
       setError(err.response?.data?.message || "Erro ao carregar orçamentos");
     } finally {
@@ -83,10 +67,42 @@ export default function Orcamentos() {
     }
   };
 
+  const carregarClientesFaltantes = async (estimates: Estimate[]) => {
+    // Filtra apenas IDs válidos (número > 0)
+    const missingClientIds = estimates
+      .filter(est => !est.client && typeof est.clientId === 'number' && est.clientId > 0)
+      .map(est => est.clientId)
+      .filter((id, index, self) => self.indexOf(id) === index);
+
+    if (missingClientIds.length === 0) return;
+
+    const clientMap = new Map<number, Client>();
+    await Promise.all(
+      missingClientIds.map(async (id) => {
+        try {
+          const client = await getClientById(id);
+          if (client) clientMap.set(id, client);
+        } catch (err) {
+          console.warn(`Cliente ${id} não encontrado ou erro ao buscar`);
+        }
+      })
+    );
+
+    setOrcamentos(prev =>
+      prev.map(est => ({
+        ...est,
+        client: est.client || clientMap.get(est.clientId) || undefined,
+      }))
+    );
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
   const handleExcluir = async (id: number) => {
     const confirmar = confirm("Tem certeza que deseja excluir este orçamento?");
     if (!confirmar) return;
-
     try {
       await deleteEstimate(id);
       setOrcamentos(orcamentos.filter((o) => o.id !== id));
@@ -96,6 +112,12 @@ export default function Orcamentos() {
   };
 
   const handleStatusChange = async (orcamento: Estimate, novoStatus: "accepted" | "pending") => {
+    // Verifica se o orçamento tem cliente válido
+    if (!orcamento.clientId || typeof orcamento.clientId !== 'number' || orcamento.clientId <= 0) {
+      alert("Este orçamento não possui um cliente válido. Corrija antes de alterar o status.");
+      return;
+    }
+
     try {
       const payload = {
         clientId: orcamento.clientId,
@@ -113,12 +135,16 @@ export default function Orcamentos() {
   };
 
   const handleConverter = async (orcamento: Estimate) => {
+    if (!orcamento.clientId || typeof orcamento.clientId !== 'number' || orcamento.clientId <= 0) {
+      alert("Este orçamento não possui um cliente válido. Não é possível converter.");
+      return;
+    }
+
     try {
       if (orcamento.status === "converted") {
         alert("Este orçamento já foi convertido em fatura.");
         return;
       }
-
       const invoiceData = {
         clientId: orcamento.clientId,
         items: orcamento.items.map(item => ({
@@ -131,7 +157,6 @@ export default function Orcamentos() {
         status: "PENDING",
       };
       await createInvoice(invoiceData);
-
       const updatePayload = {
         clientId: orcamento.clientId,
         date: orcamento.date,
@@ -139,11 +164,9 @@ export default function Orcamentos() {
         status: statusMap.converted,
       };
       await updateEstimate(orcamento.id, updatePayload);
-
       setOrcamentos(prev =>
         prev.map(o => (o.id === orcamento.id ? { ...o, status: "converted" } : o))
       );
-
       alert("Orçamento convertido em fatura com sucesso!");
     } catch (err: any) {
       console.error("Erro na conversão:", err);
@@ -153,35 +176,21 @@ export default function Orcamentos() {
 
   const handleWhatsApp = async (orcamento: Estimate) => {
     const cliente = orcamento.client;
-    if (!cliente) {
-      alert("Cliente não encontrado");
+    if (!cliente || !cliente.phone) {
+      alert("Cliente não encontrado ou sem telefone");
       return;
     }
-
     let telefone = cliente.phone.replace(/\D/g, "");
     if (telefone.length === 10 || telefone.length === 11) {
       telefone = "55" + telefone;
     }
-
     try {
       const response = await api.post(`/estimates/${orcamento.id}/share`);
       const { url: link } = response.data;
-
       const vehicleDisplay = getVehicleDisplay(cliente);
-
       const mensagem = encodeURIComponent(
-        `${link}
-
-Olá ${cliente.name}!
-
-Seu orçamento está pronto ✅
-
-👤 Cliente: ${cliente.name}
-🚗 Veículo: ${vehicleDisplay}
-💰 Total: R$ ${orcamento.total.toFixed(2)}
-📌 Status: ${getStatusLabel(orcamento.status)}`
+        `${link}\n\nOlá ${cliente.name}!\n\nSeu orçamento está pronto ✅\n\n👤 Cliente: ${cliente.name}\n🚗 Veículo: ${vehicleDisplay}\n💰 Total: R$ ${orcamento.total.toFixed(2)}\n📌 Status: ${getStatusLabel(orcamento.status)}`
       );
-
       window.open(`https://wa.me/${telefone}?text=${mensagem}`, "_blank");
     } catch (error) {
       console.error("Erro ao gerar link do orçamento:", error);
@@ -192,7 +201,6 @@ Seu orçamento está pronto ✅
   const handlePDF = (orcamento: Estimate) => {
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
     const cliente = orcamento.client;
-
     const win = window.open("", "_blank");
     if (win) {
       win.document.write(`
@@ -233,7 +241,7 @@ Seu orçamento está pronto ✅
             <p><strong>Status:</strong> ${getStatusLabel(orcamento.status)}</p>
             <div class="details">
               <h3>Itens</h3>
-              <table>
+               <table>
                 <thead>
                   <tr>
                     <th>Descrição</th>
@@ -383,19 +391,60 @@ Seu orçamento está pronto ✅
                       </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
+                          <button
+                            onClick={() => navigate(`/clientes/ver/${o.clientId}`)}
+                            style={styles.actionButton}
+                            title="Ver cliente"
+                          >
+                            <FiEye size={16} />
+                          </button>
                           {o.status === "converted" ? (
                             <>
-                              <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={styles.actionButton} title="Ver cliente"><FiEye size={16} /></button>
-                              <button onClick={() => handleExcluir(o.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir"><FiTrash2 size={16} /></button>
+                              <button
+                                onClick={() => handleExcluir(o.id)}
+                                style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }}
+                                title="Excluir"
+                              >
+                                <FiTrash2 size={16} />
+                              </button>
                             </>
                           ) : (
                             <>
-                              <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={styles.actionButton} title="Ver cliente"><FiEye size={16} /></button>
-                              <button onClick={() => navigate(`/orcamentos/editar/${o.id}`)} style={styles.actionButton} title="Editar orçamento"><FiEdit size={16} /></button>
-                              <button onClick={() => handleExcluir(o.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir"><FiTrash2 size={16} /></button>
-                              <button onClick={() => handleConverter(o)} style={{ ...styles.actionButton, color: "#ffcc00", borderColor: "#ffcc0030" }} title="Converter em Fatura"><FiRefreshCw size={16} /></button>
-                              <button onClick={() => handlePDF(o)} style={styles.actionButton} title="Gerar PDF"><FiFileText size={16} /></button>
-                              <button onClick={() => handleWhatsApp(o)} style={{ ...styles.actionButton, color: "#25D366", borderColor: "#25D36630" }} title="Enviar WhatsApp"><FiMessageCircle size={16} /></button>
+                              <button
+                                onClick={() => navigate(`/orcamentos/editar/${o.id}`)}
+                                style={styles.actionButton}
+                                title="Editar orçamento"
+                              >
+                                <FiEdit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleExcluir(o.id)}
+                                style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }}
+                                title="Excluir"
+                              >
+                                <FiTrash2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleConverter(o)}
+                                style={{ ...styles.actionButton, color: "#ffcc00", borderColor: "#ffcc0030" }}
+                                title="Converter em Fatura"
+                              >
+                                <FiRefreshCw size={16} />
+                              </button>
+                              <button
+                                onClick={() => handlePDF(o)}
+                                style={styles.actionButton}
+                                title="Gerar PDF"
+                              >
+                                <FiFileText size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleWhatsApp(o)}
+                                style={{ ...styles.actionButton, color: "#25D366", borderColor: "#25D36630" }}
+                                title="Enviar WhatsApp"
+                              >
+                                <FiMessageCircle size={16} />
+                              </button>
                             </>
                           )}
                         </div>
