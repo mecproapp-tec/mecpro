@@ -1,34 +1,63 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ClientsService } from './clients.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { Request } from 'express';
 
 @Controller('clients')
 @UseGuards(JwtAuthGuard)
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
-  @Post()
-  create(@Body() data: any, @Req() req) {
-    return this.clientsService.create(req.user.tenantId, data);
-  }
-
   @Get()
-  findAll(@Req() req) {
-    return this.clientsService.findAll(req.user.tenantId);
+  async findAll(@Req() req: Request) {
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+    const userRole = user.role;
+    return this.clientsService.findAll(tenantId, userRole);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req) {
-    return this.clientsService.findOne(Number(id), req.user.tenantId);
+  async findOne(@Param('id') id: string, @Req() req: Request) {
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+    const userRole = user.role;
+    return this.clientsService.findOne(+id, tenantId, userRole);
   }
 
-  @Put(':id')
-  update(@Param('id') id: string, @Body() data: any, @Req() req) {
-    return this.clientsService.update(Number(id), req.user.tenantId, data);
+  @Post()
+  async create(@Body() createClientDto: any, @Req() req: Request) {
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+    return this.clientsService.create(tenantId, createClientDto);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() updateClientDto: any,
+    @Req() req: Request,
+  ) {
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+    const userRole = user.role;
+    return this.clientsService.update(+id, tenantId, updateClientDto, userRole);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req) {
-    return this.clientsService.remove(Number(id), req.user.tenantId);
+  async remove(@Param('id') id: string, @Req() req: Request) {
+    const user = (req as any).user;
+    const tenantId = user.tenantId;
+    const userRole = user.role;
+    return this.clientsService.remove(+id, tenantId, userRole);
   }
 }

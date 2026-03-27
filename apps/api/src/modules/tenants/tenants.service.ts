@@ -5,9 +5,30 @@ import { PrismaService } from '../../shared/prisma/prisma.service';
 export class TenantsService {
   constructor(private prisma: PrismaService) {}
 
-  async getById(id: string) {
+  async findAll(userRole?: string) {
+    const where: any = {};
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      return [];
+    }
+    return this.prisma.tenant.findMany({
+      select: {
+        id: true,
+        name: true,
+        documentNumber: true,
+        email: true,
+        phone: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getById(id: string, userRole?: string) {
+    const where: any = { id };
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id },
+      where,
       select: {
         id: true,
         name: true,
@@ -53,7 +74,10 @@ export class TenantsService {
     return tenant;
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, userRole?: string) {
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      throw new Error('Acesso negado');
+    }
     return this.prisma.tenant.update({
       where: { id },
       data,

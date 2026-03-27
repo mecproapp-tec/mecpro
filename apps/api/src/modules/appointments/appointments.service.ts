@@ -6,7 +6,6 @@ export class AppointmentsService {
   constructor(private prisma: PrismaService) {}
 
   async create(tenantId: string, data: { clientId: number; date: string; comment?: string }) {
-    // A string de data é interpretada no fuso configurado (America/Sao_Paulo)
     const appointmentDate = new Date(data.date);
 
     return this.prisma.appointment.create({
@@ -20,25 +19,33 @@ export class AppointmentsService {
     });
   }
 
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string, userRole?: string) {
+    const where: any = {};
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     return this.prisma.appointment.findMany({
-      where: { tenantId },
+      where,
       include: { client: true },
       orderBy: { date: 'desc' },
     });
   }
 
-  async findOne(id: number, tenantId: string) {
+  async findOne(id: number, tenantId: string, userRole?: string) {
+    const where: any = { id };
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     const appointment = await this.prisma.appointment.findFirst({
-      where: { id, tenantId },
+      where,
       include: { client: true },
     });
     if (!appointment) throw new NotFoundException('Agendamento não encontrado');
     return appointment;
   }
 
-  async update(id: number, tenantId: string, data: { clientId: number; date: string; comment?: string }) {
-    await this.findOne(id, tenantId);
+  async update(id: number, tenantId: string, data: { clientId: number; date: string; comment?: string }, userRole?: string) {
+    await this.findOne(id, tenantId, userRole);
 
     const appointmentDate = new Date(data.date);
 
@@ -53,8 +60,8 @@ export class AppointmentsService {
     });
   }
 
-  async remove(id: number, tenantId: string) {
-    await this.findOne(id, tenantId);
+  async remove(id: number, tenantId: string, userRole?: string) {
+    await this.findOne(id, tenantId, userRole);
     await this.prisma.appointment.delete({ where: { id } });
     return { message: 'Agendamento removido com sucesso' };
   }

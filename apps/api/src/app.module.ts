@@ -21,6 +21,7 @@ import { ContactModule } from './modules/contact/contact.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { QueueModule } from './modules/common/queues/queue.module';
 import { StorageModule } from './modules/storage/storage.module';
+import { UsersModule } from './modules/users/users.module';
 import { PdfProcessor } from './modules/common/queues/pdf-processor.service';
 
 import { AppController } from './app.controller';
@@ -30,7 +31,7 @@ import { AppService } from './app.service';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    QueueModule, // já configura BullMQ
+    QueueModule,
     BullModule.registerQueue({ name: 'pdf' }),
     PrismaModule,
     SharedModule,
@@ -48,6 +49,7 @@ import { AppService } from './app.service';
     ContactModule,
     WhatsappModule,
     StorageModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService, PdfProcessor],

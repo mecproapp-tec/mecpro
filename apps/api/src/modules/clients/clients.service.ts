@@ -23,9 +23,15 @@ export class ClientsService {
     });
   }
 
-  async findAll(tenantId: string): Promise<Partial<Client>[]> {
+  async findAll(tenantId: string, userRole?: string): Promise<Partial<Client>[]> {
+    const where: any = {};
+    // Se não for administrador, filtra pelo tenantId
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
+
     return this.prisma.client.findMany({
-      where: { tenantId },
+      where,
       select: {
         id: true,
         name: true,
@@ -41,9 +47,15 @@ export class ClientsService {
     });
   }
 
-  async findOne(id: number, tenantId: string): Promise<Partial<Client>> {
+  async findOne(id: number, tenantId: string, userRole?: string): Promise<Partial<Client>> {
+    const where: any = { id };
+    // Se não for administrador, filtra também pelo tenantId
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
+
     const client = await this.prisma.client.findFirst({
-      where: { id, tenantId },
+      where,
       select: {
         id: true,
         name: true,
@@ -62,16 +74,17 @@ export class ClientsService {
     return client;
   }
 
-  async update(id: number, tenantId: string, data: Partial<Client>): Promise<Client> {
-    await this.findOne(id, tenantId);
+  async update(id: number, tenantId: string, data: Partial<Client>, userRole?: string): Promise<Client> {
+    // Verifica se o cliente existe e pertence ao tenant (ou é admin)
+    await this.findOne(id, tenantId, userRole);
     return this.prisma.client.update({
       where: { id },
       data,
     });
   }
 
-  async remove(id: number, tenantId: string): Promise<{ message: string }> {
-    await this.findOne(id, tenantId);
+  async remove(id: number, tenantId: string, userRole?: string): Promise<{ message: string }> {
+    await this.findOne(id, tenantId, userRole);
     await this.prisma.client.delete({ where: { id } });
     return { message: 'Cliente removido com sucesso' };
   }

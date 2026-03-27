@@ -66,9 +66,13 @@ export class EstimatesService {
     return estimate;
   }
 
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string, userRole?: string) {
+    const where: any = {};
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     return this.prisma.estimate.findMany({
-      where: { tenantId },
+      where,
       select: {
         id: true,
         clientId: true,
@@ -104,9 +108,13 @@ export class EstimatesService {
     });
   }
 
-  async findOne(id: number, tenantId: string) {
+  async findOne(id: number, tenantId: string, userRole?: string) {
+    const where: any = { id };
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     const estimate = await this.prisma.estimate.findFirst({
-      where: { id, tenantId },
+      where,
       select: {
         id: true,
         clientId: true,
@@ -146,8 +154,8 @@ export class EstimatesService {
     return estimate;
   }
 
-  async update(id: number, tenantId: string, data: { clientId: number; date: string; items: any[]; status?: string }) {
-    await this.findOne(id, tenantId);
+  async update(id: number, tenantId: string, data: { clientId: number; date: string; items: any[]; status?: string }, userRole?: string) {
+    await this.findOne(id, tenantId, userRole);
     await this.prisma.estimateItem.deleteMany({ where: { estimateId: id } });
 
     const total = data.items.reduce((acc, item) => {
@@ -193,15 +201,15 @@ export class EstimatesService {
     });
   }
 
-  async remove(id: number, tenantId: string) {
-    await this.findOne(id, tenantId);
+  async remove(id: number, tenantId: string, userRole?: string) {
+    await this.findOne(id, tenantId, userRole);
     await this.prisma.estimateItem.deleteMany({ where: { estimateId: id } });
     await this.prisma.estimate.delete({ where: { id } });
     return { message: 'Orçamento removido com sucesso' };
   }
 
-  async generateShareToken(id: number, tenantId: string): Promise<string> {
-    const estimate = await this.findOne(id, tenantId);
+  async generateShareToken(id: number, tenantId: string, userRole?: string): Promise<string> {
+    const estimate = await this.findOne(id, tenantId, userRole);
     const token = randomBytes(32).toString('hex');
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -283,9 +291,14 @@ export class EstimatesService {
     id: number,
     tenantId: string,
     workshopData?: any,
+    userRole?: string,
   ): Promise<{ whatsappLink?: string; message: string; pdfUrl?: string; queued?: boolean }> {
+    const where: any = { id, tenantId };
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     const estimate = await this.prisma.estimate.findFirst({
-      where: { id, tenantId },
+      where,
       include: { client: true, items: true, tenant: true },
     });
     if (!estimate) throw new NotFoundException('Orçamento não encontrado');

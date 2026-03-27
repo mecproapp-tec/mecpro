@@ -69,9 +69,13 @@ export class InvoicesService {
     });
   }
 
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string, userRole?: string) {
+    const where: any = {};
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     return this.prisma.invoice.findMany({
-      where: { tenantId },
+      where,
       select: {
         id: true,
         clientId: true,
@@ -107,9 +111,13 @@ export class InvoicesService {
     });
   }
 
-  async findOne(id: number, tenantId: string) {
+  async findOne(id: number, tenantId: string, userRole?: string) {
+    const where: any = { id };
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id, tenantId },
+      where,
       select: {
         id: true,
         clientId: true,
@@ -149,8 +157,8 @@ export class InvoicesService {
     return invoice;
   }
 
-  async update(id: number, tenantId: string, updateData: any) {
-    await this.findOne(id, tenantId);
+  async update(id: number, tenantId: string, updateData: any, userRole?: string) {
+    await this.findOne(id, tenantId, userRole);
 
     if (updateData.clientId) {
       const client = await this.prisma.client.findFirst({
@@ -201,15 +209,15 @@ export class InvoicesService {
     });
   }
 
-  async remove(id: number, tenantId: string) {
-    await this.findOne(id, tenantId);
+  async remove(id: number, tenantId: string, userRole?: string) {
+    await this.findOne(id, tenantId, userRole);
     await this.prisma.invoiceItem.deleteMany({ where: { invoiceId: id } });
     await this.prisma.invoice.delete({ where: { id } });
     return { message: 'Fatura removida com sucesso' };
   }
 
-  async generateShareToken(id: number, tenantId: string): Promise<string> {
-    const invoice = await this.findOne(id, tenantId);
+  async generateShareToken(id: number, tenantId: string, userRole?: string): Promise<string> {
+    const invoice = await this.findOne(id, tenantId, userRole);
 
     if (
       invoice.shareToken &&
@@ -322,9 +330,14 @@ export class InvoicesService {
     id: number,
     tenantId: string,
     workshopData?: any,
+    userRole?: string,
   ): Promise<{ whatsappLink?: string; message: string; pdfUrl?: string; queued?: boolean }> {
+    const where: any = { id };
+    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+      where.tenantId = tenantId;
+    }
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id, tenantId },
+      where,
       include: { client: true, items: true, tenant: true },
     });
     if (!invoice) throw new NotFoundException('Fatura não encontrada');
