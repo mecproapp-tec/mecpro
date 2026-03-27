@@ -22,6 +22,7 @@ import { QueueModule } from './modules/common/queues/queue.module';
 import { PdfModule } from './modules/pdf/pdf.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { PdfProcessor } from './modules/common/queues/pdf-processor.service';
+import { BrowserPoolService } from './shared/browser-pool.service'; // <-- import
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -53,6 +54,6 @@ import { AppService } from './app.service';
     StorageModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PdfProcessor],
+  providers: [AppService, PdfProcessor, BrowserPoolService], // <-- adicionado
 })
 export class AppModule {}
