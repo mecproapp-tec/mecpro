@@ -4,21 +4,15 @@
     <meta charset="UTF-8">
     <title>Fatura #{{invoiceNumber}}</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
             font-family: 'Segoe UI', 'Arial', sans-serif;
-            background: #fff;
+            margin: 0;
             padding: 20px;
+            background: #fff;
             color: #333;
             line-height: 1.5;
         }
-
-        .invoice-container {
+        .container {
             max-width: 1000px;
             margin: 0 auto;
             background: #fff;
@@ -27,12 +21,9 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             overflow: hidden;
         }
-
-        .invoice-content {
+        .content {
             padding: 30px;
         }
-
-        /* Cabeçalho */
         .header {
             display: flex;
             justify-content: space-between;
@@ -41,49 +32,34 @@
             padding-bottom: 20px;
             margin-bottom: 25px;
         }
-
         .logo {
             max-height: 70px;
             max-width: 200px;
         }
-
         .company-info {
             text-align: right;
             font-size: 12px;
             color: #555;
         }
-
         .company-info h2 {
             margin: 0 0 5px;
             color: #0077ff;
             font-size: 18px;
             font-weight: 600;
         }
-
         .company-info p {
             margin: 2px 0;
         }
-
-        /* Título */
         .title-section {
             text-align: center;
             margin-bottom: 25px;
         }
-
         .title-section h1 {
             font-size: 28px;
             color: #0077ff;
             margin: 0;
             letter-spacing: -0.5px;
         }
-
-        .invoice-number {
-            font-size: 14px;
-            color: #666;
-            margin-top: 5px;
-        }
-
-        /* Status */
         .status {
             display: inline-block;
             background: #e6f4ff;
@@ -94,46 +70,61 @@
             font-weight: bold;
             margin-top: 8px;
         }
-
-        /* Dados do cliente e veículo */
-        .client-vehicle-row {
-            display: flex;
-            gap: 20px;
+        .client-box {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
             margin-bottom: 30px;
+            border-left: 4px solid #0077ff;
         }
-
-        .client-box, .vehicle-box, .invoice-details-box {
+        .client-box h3 {
+            margin: 0 0 15px;
+            color: #0077ff;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .client-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .client-details p {
+            margin: 0;
+            font-size: 14px;
+        }
+        .client-details strong {
+            color: #0077ff;
+            font-weight: 600;
+        }
+        .invoice-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            background: #fff;
+            padding: 0;
+        }
+        .info-block {
             background: #f9f9f9;
             padding: 15px;
             border-radius: 8px;
-            flex: 1;
-            border-left: 4px solid #0077ff;
+            width: 48%;
         }
-
-        .client-box h3, .vehicle-box h3, .invoice-details-box h3 {
+        .info-block h4 {
             margin: 0 0 10px;
             color: #0077ff;
             font-size: 16px;
             font-weight: 600;
         }
-
-        .client-details p, .vehicle-details p, .invoice-details p {
+        .info-block p {
             margin: 5px 0;
             font-size: 13px;
         }
-
-        .client-details strong, .vehicle-details strong, .invoice-details strong {
-            color: #0077ff;
-        }
-
-        /* Tabela de itens */
-        .items-table {
+        table {
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
         }
-
-        .items-table th {
+        th {
             background-color: #f0f7ff;
             color: #0077ff;
             padding: 12px 10px;
@@ -141,38 +132,30 @@
             font-weight: 600;
             border-bottom: 2px solid #0077ff;
         }
-
-        .items-table td {
+        td {
             padding: 10px;
             border-bottom: 1px solid #e0e0e0;
             vertical-align: top;
         }
-
         .text-right {
             text-align: right;
         }
-
-        /* Totais */
         .totals {
             text-align: right;
             margin-top: 20px;
             padding-top: 15px;
             border-top: 1px solid #e0e0e0;
         }
-
         .totals p {
             margin: 5px 0;
             font-size: 14px;
         }
-
         .grand-total {
             font-size: 18px;
             font-weight: bold;
             color: #0077ff;
             margin-top: 10px;
         }
-
-        /* Rodapé */
         .footer {
             margin-top: 40px;
             font-size: 11px;
@@ -181,32 +164,11 @@
             border-top: 1px solid #eee;
             padding-top: 15px;
         }
-
-        /* Responsividade para impressão */
-        @media print {
-            body {
-                background: white;
-                padding: 0;
-                margin: 0;
-            }
-            .invoice-container {
-                box-shadow: none;
-                border: none;
-            }
-            .client-box, .vehicle-box, .invoice-details-box {
-                background-color: #f9f9f9;
-                break-inside: avoid;
-            }
-            .items-table th {
-                background-color: #f0f7ff;
-            }
-        }
     </style>
 </head>
 <body>
-    <div class="invoice-container">
-        <div class="invoice-content">
-            <!-- Cabeçalho -->
+    <div class="container">
+        <div class="content">
             <div class="header">
                 <div class="logo">
                     {{#if logoUrl}}
@@ -224,45 +186,38 @@
                 </div>
             </div>
 
-            <!-- Título e status -->
             <div class="title-section">
-                <h1>FATURA</h1>
-                <div class="invoice-number">Nº {{invoiceNumber}}</div>
+                <h1>FATURA Nº {{invoiceNumber}}</h1>
                 <span class="status">{{status}}</span>
             </div>
 
-            <!-- Dados do cliente, veículo e detalhes da fatura -->
-            <div class="client-vehicle-row">
-                <div class="client-box">
-                    <h3>Cliente</h3>
-                    <div class="client-details">
-                        <p><strong>Nome:</strong> {{client.name}}</p>
-                        <p><strong>CPF/CNPJ:</strong> {{client.document}}</p>
-                        <p><strong>Endereço:</strong> {{client.address}}</p>
-                        <p><strong>Telefone:</strong> {{client.phone}}</p>
-                    </div>
-                </div>
-                <div class="vehicle-box">
-                    <h3>Veículo</h3>
-                    <div class="vehicle-details">
-                        <p><strong>Modelo:</strong> {{client.vehicle}}</p>
-                        <p><strong>Placa:</strong> {{client.plate}}</p>
-                    </div>
-                </div>
-                <div class="invoice-details-box">
-                    <h3>Detalhes</h3>
-                    <div class="invoice-details">
-                        <p><strong>Emissão:</strong> {{issueDate}}</p>
-                        {{#if dueDate}}
-                        <p><strong>Vencimento:</strong> {{dueDate}}</p>
-                        {{/if}}
-                        <p><strong>Status:</strong> {{status}}</p>
-                    </div>
+            <div class="client-box">
+                <h3>Dados do Cliente</h3>
+                <div class="client-details">
+                    <p><strong>Nome:</strong> {{client.name}}</p>
+                    <p><strong>Telefone:</strong> {{client.phone}}</p>
+                    <p><strong>Veículo:</strong> {{client.vehicle}}</p>
+                    <p><strong>Placa:</strong> {{client.plate}}</p>
+                    <p><strong>CPF/CNPJ:</strong> {{client.document}}</p>
+                    <p><strong>Endereço:</strong> {{client.address}}</p>
                 </div>
             </div>
 
-            <!-- Itens -->
-            <table class="items-table">
+            <div class="invoice-info">
+                <div class="info-block">
+                    <h4>Emissão</h4>
+                    <p><strong>Data:</strong> {{issueDate}}</p>
+                    {{#if dueDate}}
+                    <p><strong>Vencimento:</strong> {{dueDate}}</p>
+                    {{/if}}
+                </div>
+                <div class="info-block">
+                    <h4>Observações</h4>
+                    <p>Fatura emitida eletronicamente.</p>
+                </div>
+            </div>
+
+            <table>
                 <thead>
                     <tr>
                         <th>Descrição</th>
@@ -283,18 +238,16 @@
                 </tbody>
             </table>
 
-            <!-- Totais -->
             <div class="totals">
                 <p><strong>Subtotal:</strong> R$ {{subtotal}}</p>
                 {{#if issValue}}
-                <p><strong>ISS ({{issRate}}%):</strong> R$ {{issValue}}</p>
+                <p><strong>ISS Total:</strong> R$ {{issValue}}</p>
                 {{/if}}
                 <div class="grand-total">
                     <strong>TOTAL A PAGAR: R$ {{total}}</strong>
                 </div>
             </div>
 
-            <!-- Rodapé -->
             <div class="footer">
                 <p>{{companyName}} - {{companyDocument}}</p>
                 <p>{{companyPhone}} | {{companyEmail}}</p>
