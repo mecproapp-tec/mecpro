@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { PaymentService } from '../payments/payment.service';
 import { Request } from 'express';
+import { RegisterAdminDto } from './dto/register-admin.dto';
 
 @Injectable()
 export class AuthService {
@@ -121,11 +122,14 @@ export class AuthService {
     };
   }
 
-  async registerAdmin(data: { name: string; email: string; password: string }) {
+  async registerAdmin(data: RegisterAdminDto) {
     const existingUser = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existingUser) throw new BadRequestException('Email já cadastrado');
 
+    // ID fixo para o tenant do super admin
     const ADMIN_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
+    // Garante que o tenant do admin exista
     let adminTenant = await this.prisma.tenant.findUnique({ where: { id: ADMIN_TENANT_ID } });
     if (!adminTenant) {
       adminTenant = await this.prisma.tenant.create({
@@ -154,7 +158,7 @@ export class AuthService {
       },
     });
 
-    return { message: 'Administrador cadastrado com sucesso' };
+    return { message: 'Administrador cadastrado com sucesso', user: { id: user.id, name: user.name, email: user.email, role: user.role } };
   }
 
   async login(email: string, password: string, req: Request) {
@@ -167,7 +171,8 @@ export class AuthService {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('Senha incorreta');
 
-    if (user.tenant?.status !== 'ACTIVE') {
+    // Super admin não tem tenant associado ou o tenant é o especial; verifica status apenas se tenant existir e não for o admin
+    if (user.tenant && user.tenant.status !== 'ACTIVE' && user.role !== 'SUPER_ADMIN') {
       throw new UnauthorizedException('Sua conta está bloqueada. Entre em contato com o administrador.');
     }
 

@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt.guard';
+import { RegisterAdminDto } from './dto/register-admin.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -31,7 +32,7 @@ export class AuthController {
   }
 
   @Post('register-admin')
-  async registerAdmin(@Body() body: { name: string; email: string; password: string }) {
+  async registerAdmin(@Body() body: RegisterAdminDto) {
     return this.authService.registerAdmin(body);
   }
 
