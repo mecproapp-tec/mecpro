@@ -9,6 +9,7 @@ async function bootstrap() {
   process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled Rejection:', reason);
   });
+
   process.on('uncaughtException', (err) => {
     console.error('❌ Uncaught Exception:', err);
   });
@@ -28,27 +29,39 @@ async function bootstrap() {
     }),
   );
 
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
-    .split(',')
-    .map(o => o.trim())
-    .filter(Boolean);
-  if (allowedOrigins.length === 0) {
-    console.warn('⚠️  ALLOWED_ORIGINS não configurada – CORS permitirá localhost apenas.');
-  }
-  const devOrigins = ['http://localhost:5173', 'http://localhost:3000'];
-
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || devOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
+
+      const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+        .split(',')
+        .map(o => o.trim())
+        .filter(Boolean);
+
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        origin.includes('vercel.app') ||
+        origin.includes('mecpro.tec.br') ||
+        origin.includes('localhost');
+
+      if (isAllowed) {
+        return callback(null, true);
       }
+
+      console.error('❌ CORS bloqueado para origem:', origin);
+      return callback(new Error('Not allowed by CORS'));
     },
-    credentials: true,
+
+    credentials: false,
+
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
+
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'ngrok-skip-browser-warning',
+    ],
+
     optionsSuccessStatus: 200,
   });
 
@@ -59,11 +72,15 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
   app.setGlobalPrefix('api');
 
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    });
   });
 
   const port = process.env.PORT || 3000;
@@ -73,9 +90,14 @@ async function bootstrap() {
     console.log(`📡 Tentando iniciar servidor em ${host}:${port}`);
     const server = await app.listen(port, host);
     const address = server.address();
+
     console.log(`✅ Servidor ouvindo em http://${host}:${port}`);
     console.log(`📡 Endereço real: ${JSON.stringify(address)}`);
-    console.log(`🚀 API rodando em ${process.env.APP_URL || `http://localhost:${port}`}`);
+    console.log(
+      `🚀 API rodando em ${
+        process.env.APP_URL || `http://localhost:${port}`
+      }`,
+    );
   } catch (err) {
     console.error('❌ Falha ao iniciar servidor:', err);
     process.exit(1);

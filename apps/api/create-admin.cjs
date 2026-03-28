@@ -12,7 +12,6 @@ async function createOrUpdateAdmin() {
   });
 
   if (existingAdmin) {
-    // Atualiza senha e role para ADMIN
     await prisma.user.update({
       where: { id: existingAdmin.id },
       data: {
@@ -22,14 +21,34 @@ async function createOrUpdateAdmin() {
     });
     console.log('✅ Usuário administrador atualizado com sucesso!');
   } else {
-    // Cria novo admin
+    // Cria um tenant administrativo se não existir
+    let adminTenant = await prisma.tenant.findUnique({
+      where: { id: '00000000-0000-0000-0000-000000000001' }
+    });
+    if (!adminTenant) {
+      adminTenant = await prisma.tenant.create({
+        data: {
+          id: '00000000-0000-0000-0000-000000000001',
+          name: 'Administração',
+          documentType: 'ADMIN',
+          documentNumber: '00000000000000',
+          cep: '00000000',
+          address: 'Sistema',
+          email: 'admin@mecpro.com',
+          phone: '0000000000',
+          status: 'ACTIVE',
+        },
+      });
+    }
+
     await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         role: 'ADMIN',
-        name: 'Administrador'
-      }
+        name: 'Administrador',
+        tenantId: adminTenant.id,
+      },
     });
     console.log('✅ Usuário administrador criado com sucesso!');
   }
