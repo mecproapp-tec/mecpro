@@ -129,10 +129,10 @@ export class InvoicesPdfService {
               <div class="info-block"><h4>Emissão</h4><p><strong>Data:</strong> {{issueDate}}</p>{{#if dueDate}}<p><strong>Vencimento:</strong> {{dueDate}}</p>{{/if}}</div>
               <div class="info-block"><h4>Observações</h4><p>Fatura emitida eletronicamente.</p></div>
             </div>
-             <table>
-              <thead><tr><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Unitário (R$)</th><th class="text-right">Total (R$)</th></tr></thead>
-              <tbody>{{#each items}}<tr><td>{{this.description}}</td><td class="text-right">{{this.quantity}}</td><td class="text-right">{{this.unitPrice}}</td><td class="text-right">{{this.total}}</td></tr>{{/each}}</tbody>
-            </table>
+              <table>
+                <thead><tr><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Unitário (R$)</th><th class="text-right">Total (R$)</th></tr></thead>
+                <tbody>{{#each items}}<tr><td>{{this.description}}</td><td class="text-right">{{this.quantity}}</td><td class="text-right">{{this.unitPrice}}</td><td class="text-right">{{this.total}}</td></tr>{{/each}}</tbody>
+              </table>
             <div class="totals">
               <p><strong>Subtotal:</strong> R$ {{subtotal}}</p>
               {{#if issValue}}<p><strong>ISS Total:</strong> R$ {{issValue}}</p>{{/if}}
@@ -177,21 +177,32 @@ export class InvoicesPdfService {
       const html = compiledTemplate(data);
       this.logger.debug(`HTML gerado, tamanho: ${html.length}`);
 
-      // 🔁 EXATAMENTE COMO NOS ORÇAMENTOS
+      // 🔍 LOGS DETALHADOS
+      this.logger.log('Obtendo navegador do pool...');
       const browser = await this.browserPool.getBrowser();
+      this.logger.log('Navegador obtido, criando página...');
       const page = await browser.newPage();
 
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      // TENTATIVA 1: networkidle0
+      this.logger.log('Tentando setContent com waitUntil: networkidle0...');
+      try {
+        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
+        this.logger.log('setContent com networkidle0 bem-sucedido');
+      } catch (err) {
+        this.logger.warn(`setContent com networkidle0 falhou: ${err.message}. Tentando com load...`);
+        await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
+        this.logger.log('setContent com load bem-sucedido');
+      }
 
+      this.logger.log('Gerando PDF...');
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
         margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
       });
+      this.logger.log(`PDF gerado com sucesso, tamanho: ${pdfBuffer.length} bytes`);
 
       await page.close();
-
-      this.logger.log(`PDF gerado com sucesso, tamanho: ${pdfBuffer.length} bytes`);
       return Buffer.from(pdfBuffer);
     } catch (error) {
       this.logger.error(`Erro ao gerar PDF da fatura ${invoice.id}:`, error.stack);
