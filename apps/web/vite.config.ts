@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["@tanstack/react-query"], // força o pré-processamento
+    include: ["@tanstack/react-query"],
   },
   build: {
     outDir: "dist",
