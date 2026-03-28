@@ -326,6 +326,7 @@ export class InvoicesService {
     return pdfBuffer;
   }
 
+  // ================== MÉTODO CORRIGIDO ==================
   async sendViaWhatsApp(
     id: number,
     tenantId: string,
@@ -347,75 +348,24 @@ export class InvoicesService {
       throw new BadRequestException('Cliente sem telefone');
     }
 
-    if (invoice.pdfUrl && invoice.pdfStatus === 'generated') {
-      const pdfUrl = invoice.pdfUrl;
-      const message = this.buildWhatsAppMessage(invoice, pdfUrl);
-      const whatsappLink = this.whatsappService.generateWhatsAppLink(client.phone, message);
-      return { whatsappLink, message, pdfUrl };
+    // Gera token de compartilhamento (se necessário)
+    let token = invoice.shareToken;
+    if (!token || (invoice.shareTokenExpires && new Date() > invoice.shareTokenExpires)) {
+      token = await this.generateShareToken(invoice.id, tenantId, userRole);
     }
 
-    const tenant = invoice.tenant;
-    const effectiveTenant = workshopData
-      ? {
-          ...tenant,
-          name: workshopData.name || tenant.name,
-          documentNumber: workshopData.documentNumber || tenant.documentNumber,
-          phone: workshopData.phone || tenant.phone,
-          email: workshopData.email || tenant.email,
-          logoUrl: workshopData.logoUrl || tenant.logoUrl,
-        }
-      : tenant;
+    // Constrói a URL pública da API (rota que retorna o PDF)
+    const apiBase = (process.env.API_URL || process.env.APP_URL || 'https://api.mecpro.tec.br').replace(/\/api$/, '');
+    const pdfUrl = `${apiBase}/api/public/invoices/share/${token}`;
 
-    const invoiceData = {
-      logoUrl: effectiveTenant.logoUrl,
-      invoiceNumber: invoice.number,
-      client: {
-        name: client.name,
-        document: client.document || 'Não informado',
-        address: client.address || '',
-        phone: client.phone,
-        vehicle: client.vehicle,
-        plate: client.plate,
-      },
-      issueDate: new Date(invoice.createdAt).toLocaleDateString('pt-BR'),
-      dueDate: '',
-      status: this.getStatusText(invoice.status),
-      items: invoice.items.map(item => ({
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.price.toFixed(2),
-        total: (item.price * item.quantity + (item.issPercent ? item.price * item.quantity * (item.issPercent / 100) : 0)).toFixed(2),
-      })),
-      subtotal: invoice.items.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2),
-      issRate: 0,
-      issValue: invoice.items.reduce((acc, item) => {
-        const iss = item.issPercent ? item.price * item.quantity * (item.issPercent / 100) : 0;
-        return acc + iss;
-      }, 0).toFixed(2),
-      total: invoice.total.toFixed(2),
-      companyName: effectiveTenant.name || 'Oficina',
-      companyDocument: effectiveTenant.documentNumber || '',
-      companyPhone: effectiveTenant.phone || '',
-      companyEmail: effectiveTenant.email || '',
-    };
+    const message = this.buildWhatsAppMessage(invoice, pdfUrl);
+    const whatsappLink = this.whatsappService.generateWhatsAppLink(client.phone, message);
 
-    await this.pdfQueue.add('generate', {
-      tenantId,
-      entityId: id,
-      entityType: 'invoice',
-      data: invoiceData,
-    });
-
-    await this.prisma.invoice.update({
-      where: { id, tenantId },
-      data: { pdfStatus: 'pending' },
-    });
-
-    return {
-      message: 'PDF em processamento. O link será enviado em breve.',
-      queued: true,
-    };
+    // Se o PDF ainda não foi gerado, podemos enfileirar a geração (opcional)
+    // O método getPdfByShareToken já gera sob demanda, então não precisamos esperar.
+    return { whatsappLink, message, pdfUrl };
   }
+  // ====================================================
 
   private buildWhatsAppMessage(invoice: any, pdfUrl: string): string {
     const client = invoice.client;

@@ -27,39 +27,37 @@ export class InvoicesController {
 
   @Get()
   findAll(@Req() req) {
-    return this.invoicesService.findAll(req.user.tenantId);
+    return this.invoicesService.findAll(req.user.tenantId, req.user.role);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req) {
-    return this.invoicesService.findOne(Number(id), req.user.tenantId);
+    return this.invoicesService.findOne(Number(id), req.user.tenantId, req.user.role);
   }
 
   @Put(':id')
   update(@Param('id') id: string, @Body() body: any, @Req() req) {
-    return this.invoicesService.update(Number(id), req.user.tenantId, body);
+    return this.invoicesService.update(Number(id), req.user.tenantId, body, req.user.role);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req) {
-    return this.invoicesService.remove(Number(id), req.user.tenantId);
+    return this.invoicesService.remove(Number(id), req.user.tenantId, req.user.role);
   }
 
- @Post(':id/share')
-async generateShareLink(@Param('id') id: string, @Req() req) {
-  const token = await this.invoicesService.generateShareToken(
-    Number(id),
-    req.user.tenantId
-  );
+  @Post(':id/share')
+  async generateShareLink(@Param('id') id: string, @Req() req) {
+    const token = await this.invoicesService.generateShareToken(
+      Number(id),
+      req.user.tenantId,
+      req.user.role,
+    );
 
-  const baseUrl =
-    process.env.APP_URL?.replace(/\/$/, '') || 'http://localhost:5173';
-
-  return {
-    url: `${baseUrl}/invoice/${token}`,
-    token,
-  };
-}
+    // Base da API (remove /api final se existir)
+    const apiBase = (process.env.API_URL || process.env.APP_URL || 'https://api.mecpro.tec.br').replace(/\/api$/, '');
+    const url = `${apiBase}/api/public/invoices/share/${token}`;
+    return { url, token };
+  }
 }
 
 @Controller('public/invoices')
