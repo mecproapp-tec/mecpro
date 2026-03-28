@@ -19,31 +19,38 @@ export class AppointmentsService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Converte a string do frontend para UTC, assumindo que ela representa
-   * um horário no fuso do Brasil (America/Sao_Paulo).
+   * Remove qualquer offset de fuso horário da string (ex: -03:00, Z, +01:00)
+   */
+  private cleanDateString(dateString: string): string {
+    return dateString.replace(/[+-]\d{2}:\d{2}$|Z$/i, '');
+  }
+
+  /**
+   * Converte a string recebida (frontend) para UTC, assumindo que ela representa
+   * um horário no fuso do Brasil.
    */
   private convertToUTC(dateString: string): Date {
-    const local = dayjs(dateString, { local: true });
-    if (!local.isValid()) {
+    const clean = this.cleanDateString(dateString);
+    const brazilTime = dayjs.tz(clean, BRAZIL_TZ);
+    if (!brazilTime.isValid()) {
       throw new BadRequestException('Data inválida');
     }
-    const brazilTime = local.tz(BRAZIL_TZ);
     return brazilTime.utc().toDate();
   }
 
   /**
-   * Converte data do banco (UTC) para string no fuso Brasil.
+   * Converte data do banco (UTC) para string no fuso do Brasil.
    */
   private convertToBrazil(date: Date): string {
     return dayjs(date).tz(BRAZIL_TZ).format();
   }
 
   /**
-   * Verifica se a data (no fuso Brasil) é futura.
+   * Verifica se a data (interpretada no fuso do Brasil) é futura.
    */
   private isFuture(dateString: string): boolean {
-    const local = dayjs(dateString, { local: true });
-    const brazilTime = local.tz(BRAZIL_TZ);
+    const clean = this.cleanDateString(dateString);
+    const brazilTime = dayjs.tz(clean, BRAZIL_TZ);
     const nowBrazil = dayjs().tz(BRAZIL_TZ);
     return brazilTime.isAfter(nowBrazil);
   }
