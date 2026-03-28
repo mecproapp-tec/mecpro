@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "prebuild": "node -e \"try{require.resolve('@tanstack/react-query')}catch(e){console.error('❌ @tanstack/react-query não encontrado! Execute npm install.');process.exit(1)}\"",
+    "build": "npm run prebuild && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
