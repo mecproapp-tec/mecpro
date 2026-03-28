@@ -55,7 +55,7 @@ export class InvoicesPdfService {
       const companyEmail = tenant?.email || process.env.COMPANY_EMAIL || 'contato@oficina.com';
       const logoUrl = tenant?.logoUrl || process.env.LOGO_URL || '';
 
-      // Carrega o template (com fallback inline)
+      // Carrega o template (fallback inline se não encontrar)
       let templateContent: string;
       const templatePath = path.join(__dirname, 'invoice-pdf.hbs');
       try {
@@ -63,7 +63,6 @@ export class InvoicesPdfService {
         this.logger.log(`Template carregado de ${templatePath}`);
       } catch (err) {
         this.logger.warn(`Template não encontrado em ${templatePath}, usando fallback inline.`);
-        // Fallback inline com o mesmo HTML do seu invoice-pdf.hbs (copiado integralmente)
         templateContent = `<!DOCTYPE html>
         <html lang="pt-BR">
         <head><meta charset="UTF-8"><title>Fatura #{{invoiceNumber}}</title>
@@ -130,7 +129,7 @@ export class InvoicesPdfService {
               <div class="info-block"><h4>Emissão</h4><p><strong>Data:</strong> {{issueDate}}</p>{{#if dueDate}}<p><strong>Vencimento:</strong> {{dueDate}}</p>{{/if}}</div>
               <div class="info-block"><h4>Observações</h4><p>Fatura emitida eletronicamente.</p></div>
             </div>
-            <table>
+             <table>
               <thead><tr><th>Descrição</th><th class="text-right">Qtd</th><th class="text-right">Valor Unitário (R$)</th><th class="text-right">Total (R$)</th></tr></thead>
               <tbody>{{#each items}}<tr><td>{{this.description}}</td><td class="text-right">{{this.quantity}}</td><td class="text-right">{{this.unitPrice}}</td><td class="text-right">{{this.total}}</td></tr>{{/each}}</tbody>
             </table>
@@ -178,14 +177,18 @@ export class InvoicesPdfService {
       const html = compiledTemplate(data);
       this.logger.debug(`HTML gerado, tamanho: ${html.length}`);
 
+      // 🔁 EXATAMENTE COMO NOS ORÇAMENTOS
       const browser = await this.browserPool.getBrowser();
       const page = await browser.newPage();
+
       await page.setContent(html, { waitUntil: 'networkidle0' });
+
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
         margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
       });
+
       await page.close();
 
       this.logger.log(`PDF gerado com sucesso, tamanho: ${pdfBuffer.length} bytes`);
