@@ -13,16 +13,50 @@ export default function NovoCliente() {
     phone: "",
     vehicle: "",
     plate: "",
-    document: "", // <-- novo campo
-    address: "",  // <-- novo campo
+    document: "", // campo composto (tipo + número)
+    address: "",
   });
+
+  // Estados para controle do documento
+  const [docType, setDocType] = useState<"CPF" | "RG" | "CNH">("CPF");
+  const [docNumber, setDocNumber] = useState("");
+  const [docError, setDocError] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (isEditing) {
-      carregarCliente();
+  // Tamanho máximo para cada tipo
+  const getMaxLength = (type: string) => {
+    switch (type) {
+      case "CPF": return 11;
+      case "CNH": return 11;
+      case "RG": return 12; // RG pode ter até 12 dígitos (incluindo dígito verificador)
+      default: return 11;
     }
+  };
+
+  // Valida se o número tem o comprimento esperado
+  const validateDocNumber = (type: string, number: string) => {
+    if (number.length > 0 && number.length !== getMaxLength(type)) {
+      setDocError(`${type} deve ter exatamente ${getMaxLength(type)} dígitos.`);
+      return false;
+    }
+    setDocError("");
+    return true;
+  };
+
+  // Sincroniza o campo composto "document" com os estados separados
+  useEffect(() => {
+    if (docNumber) {
+      setFormData(prev => ({ ...prev, document: `${docType} ${docNumber}` }));
+    } else {
+      setFormData(prev => ({ ...prev, document: "" }));
+    }
+  }, [docType, docNumber]);
+
+  // Carrega dados do cliente se estiver editando
+  useEffect(() => {
+    if (isEditing) carregarCliente();
   }, [id]);
 
   const carregarCliente = async () => {
@@ -36,6 +70,27 @@ export default function NovoCliente() {
         document: cliente.document || "",
         address: cliente.address || "",
       });
+
+      // Extrai tipo e número do campo composto
+      if (cliente.document) {
+        const parts = cliente.document.split(" ");
+        if (parts.length >= 2) {
+          const tipo = parts[0] as "CPF" | "RG" | "CNH";
+          if (["CPF", "RG", "CNH"].includes(tipo)) {
+            setDocType(tipo);
+            setDocNumber(parts.slice(1).join(" "));
+          } else {
+            setDocType("CPF");
+            setDocNumber("");
+          }
+        } else {
+          setDocType("CPF");
+          setDocNumber("");
+        }
+      } else {
+        setDocType("CPF");
+        setDocNumber("");
+      }
     } catch (err: any) {
       setError("Erro ao carregar cliente");
     }
@@ -45,8 +100,27 @@ export default function NovoCliente() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleDocTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setDocType(e.target.value as "CPF" | "RG" | "CNH");
+    setDocNumber("");
+    setDocError("");
+  };
+
+  const handleDocNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ""); // permite apenas números
+    setDocNumber(value);
+    validateDocNumber(docType, value);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validação do documento antes de enviar
+    if (docNumber && !validateDocNumber(docType, docNumber)) {
+      setError(docError);
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -139,6 +213,7 @@ export default function NovoCliente() {
           )}
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            {/* Nome */}
             <div>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", color: "#a0a0a0" }}>
                 Nome
@@ -165,6 +240,7 @@ export default function NovoCliente() {
               />
             </div>
 
+            {/* Telefone */}
             <div>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", color: "#a0a0a0" }}>
                 Telefone
@@ -191,6 +267,7 @@ export default function NovoCliente() {
               />
             </div>
 
+            {/* Veículo */}
             <div>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", color: "#a0a0a0" }}>
                 Veículo
@@ -217,6 +294,7 @@ export default function NovoCliente() {
               />
             </div>
 
+            {/* Placa */}
             <div>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", color: "#a0a0a0" }}>
                 Placa
@@ -244,33 +322,66 @@ export default function NovoCliente() {
               />
             </div>
 
-            {/* NOVO CAMPO: Documento */}
+            {/* Documento (tipo + número) */}
             <div>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", color: "#a0a0a0" }}>
-                Documento (CPF/CNPJ/RG/CNH)
+                Documento
               </label>
-              <input
-                type="text"
-                name="document"
-                value={formData.document}
-                onChange={handleChange}
-                style={{
-                  width: "100%",
-                  padding: "16px",
-                  borderRadius: "16px",
-                  border: "1px solid #333",
-                  background: "#1a1a1a",
-                  color: "#fff",
-                  fontSize: "16px",
-                  outline: "none",
-                }}
-                onFocus={(e) => (e.target.style.borderColor = "#00e5ff")}
-                onBlur={(e) => (e.target.style.borderColor = "#333")}
-                disabled={loading}
-              />
+              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                <select
+                  value={docType}
+                  onChange={handleDocTypeChange}
+                  disabled={loading}
+                  style={{
+                    flex: "0 0 100px",
+                    padding: "16px",
+                    borderRadius: "16px",
+                    border: "1px solid #333",
+                    background: "#1a1a1a",
+                    color: "#fff",
+                    fontSize: "16px",
+                    outline: "none",
+                    cursor: "pointer",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "#00e5ff")}
+                  onBlur={(e) => (e.target.style.borderColor = "#333")}
+                >
+                  <option value="CPF">CPF</option>
+                  <option value="RG">RG</option>
+                  <option value="CNH">CNH</option>
+                </select>
+                <input
+                  type="text"
+                  value={docNumber}
+                  onChange={handleDocNumberChange}
+                  placeholder={`Digite o número do ${docType}`}
+                  maxLength={getMaxLength(docType)}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    padding: "16px",
+                    borderRadius: "16px",
+                    border: `1px solid ${docError ? "#ff4444" : "#333"}`,
+                    background: "#1a1a1a",
+                    color: "#fff",
+                    fontSize: "16px",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "#00e5ff")}
+                  onBlur={(e) => {
+                    if (!docError) e.target.style.borderColor = "#333";
+                    else e.target.style.borderColor = "#ff4444";
+                  }}
+                />
+              </div>
+              {docError && (
+                <div style={{ marginTop: "4px", fontSize: "12px", color: "#ff8888" }}>
+                  {docError}
+                </div>
+              )}
             </div>
 
-            {/* NOVO CAMPO: Endereço */}
+            {/* Endereço */}
             <div>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", color: "#a0a0a0" }}>
                 Endereço
@@ -296,6 +407,7 @@ export default function NovoCliente() {
               />
             </div>
 
+            {/* Botão de envio */}
             <button
               type="submit"
               disabled={loading}
