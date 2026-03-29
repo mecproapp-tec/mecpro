@@ -13,11 +13,11 @@ export default function NovoCliente() {
     phone: "",
     vehicle: "",
     plate: "",
-    document: "", // campo composto (tipo + número)
+    document: "",
     address: "",
   });
 
-  // Estados para controle do documento
+  // Estados auxiliares para controle do documento (tipo + número)
   const [docType, setDocType] = useState<"CPF" | "RG" | "CNH">("CPF");
   const [docNumber, setDocNumber] = useState("");
   const [docError, setDocError] = useState("");
@@ -25,17 +25,15 @@ export default function NovoCliente() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Tamanho máximo para cada tipo
   const getMaxLength = (type: string) => {
     switch (type) {
       case "CPF": return 11;
       case "CNH": return 11;
-      case "RG": return 12; // RG pode ter até 12 dígitos (incluindo dígito verificador)
+      case "RG": return 12;
       default: return 11;
     }
   };
 
-  // Valida se o número tem o comprimento esperado
   const validateDocNumber = (type: string, number: string) => {
     if (number.length > 0 && number.length !== getMaxLength(type)) {
       setDocError(`${type} deve ter exatamente ${getMaxLength(type)} dígitos.`);
@@ -54,7 +52,6 @@ export default function NovoCliente() {
     }
   }, [docType, docNumber]);
 
-  // Carrega dados do cliente se estiver editando
   useEffect(() => {
     if (isEditing) carregarCliente();
   }, [id]);
@@ -107,7 +104,7 @@ export default function NovoCliente() {
   };
 
   const handleDocNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, ""); // permite apenas números
+    const value = e.target.value.replace(/\D/g, "");
     setDocNumber(value);
     validateDocNumber(docType, value);
   };
@@ -115,7 +112,6 @@ export default function NovoCliente() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validação do documento antes de enviar
     if (docNumber && !validateDocNumber(docType, docNumber)) {
       setError(docError);
       return;
@@ -322,7 +318,7 @@ export default function NovoCliente() {
               />
             </div>
 
-            {/* Documento (tipo + número) */}
+            {/* Documento */}
             <div>
               <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", color: "#a0a0a0" }}>
                 Documento
@@ -407,7 +403,6 @@ export default function NovoCliente() {
               />
             </div>
 
-            {/* Botão de envio */}
             <button
               type="submit"
               disabled={loading}
