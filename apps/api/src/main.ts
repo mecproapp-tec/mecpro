@@ -1,3 +1,4 @@
+// src/main.ts
 process.env.TZ = 'America/Sao_Paulo';
 
 import { NestFactory } from '@nestjs/core';
@@ -21,6 +22,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // Helmet com configurações adequadas para CORS
   app.use(
     helmet({
       crossOriginResourcePolicy: false,
@@ -35,44 +37,47 @@ async function bootstrap() {
     .map(o => o.trim())
     .filter(Boolean);
 
-  // Origens padrão (inclui admin e portas de desenvolvimento)
+  // Origens padrão (inclui admin, www e previews da Vercel)
   const defaultOrigins = [
     'https://www.mecpro.tec.br',
     'https://mecpro.tec.br',
-    'https://admin.mecpro.tec.br',   // admin em produção
-    'http://localhost:5173',          // web em desenvolvimento
-    'http://localhost:5174',          // admin em desenvolvimento (NOVA PORTA)
-    'http://localhost:3001',          // admin alternativa
+    'https://admin.mecpro.tec.br',
+    'https://adminmecpro-auewpg8kk-thiagos-projects-381b904e.vercel.app',
+    'https://mec-pro-3qhm-264y7u867-thiagos-projects-381b904e.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3001',
+    'http://localhost:8080',
   ];
 
   const origins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
 
+  // Configuração de CORS
   app.enableCors({
     origin: (origin, callback) => {
-      // Permitir requisições sem origin (ex: ferramentas de saúde, curl)
+      // Permite requisições sem origin (curl, ferramentas de saúde)
       if (!origin) return callback(null, true);
 
       // Verifica se a origem está na lista de permitidas
       const isAllowed = origins.some(allowed => {
-        // Permite correspondência exata
+        // Comparação exata
         if (allowed === origin) return true;
-        // Permite subdomínios (ex: admin.mecpro.tec.br)
+        // Permite subdomínios de domínios principais (ex: admin.mecpro.tec.br)
         if (origin.endsWith(`.${allowed.replace('https://', '')}`)) return true;
+        // Permite localhost em qualquer porta
+        if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true;
         return false;
       });
 
-      // Também permite localhost para desenvolvimento (qualquer porta)
-      const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
-
-      if (isAllowed || isLocalhost) {
+      if (isAllowed) {
         return callback(null, true);
       }
 
-      // Em produção, rejeitamos origens não autorizadas
+      // Em produção, rejeita origens não autorizadas
       console.warn(`❌ CORS bloqueado para origem: ${origin}`);
       callback(new Error(`Origem não permitida pelo CORS: ${origin}`));
     },
-    credentials: true, // ESSENCIAL: permite envio de cookies/cabeçalhos de autenticação
+    credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
@@ -82,6 +87,7 @@ async function bootstrap() {
     optionsSuccessStatus: 200,
   });
 
+  // Validação global
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -90,9 +96,10 @@ async function bootstrap() {
     }),
   );
 
+  // Prefixo global para todas as rotas
   app.setGlobalPrefix('api');
 
-  // Endpoint de saúde sem prefixo /api para facilitar monitoramento
+  // Endpoint de saúde sem prefixo /api para monitoramento
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.get('/health', (req, res) => {
     res.status(200).json({
