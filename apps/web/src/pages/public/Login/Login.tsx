@@ -1,22 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (user) {
-      navigate("/home");
-    }
-  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +24,7 @@ export default function Login() {
       const message =
         err.response?.data?.message ||
         "Erro ao fazer login. Verifique suas credenciais.";
+
       setError(message);
       console.error("Erro no login:", err);
     } finally {
@@ -130,7 +125,6 @@ export default function Login() {
                 color: "#fff",
                 fontSize: "16px",
                 outline: "none",
-                transition: "border 0.2s",
               }}
             />
           </div>
@@ -164,7 +158,6 @@ export default function Login() {
                 color: "#fff",
                 fontSize: "16px",
                 outline: "none",
-                transition: "border 0.2s",
               }}
             />
           </div>
@@ -182,7 +175,7 @@ export default function Login() {
                 accentColor: "#00e5ff",
               }}
             />
-            <label htmlFor="remember" style={{ color: "#a0a0a0", cursor: "pointer" }}>
+            <label htmlFor="remember" style={{ color: "#a0a0a0" }}>
               Lembrar
             </label>
           </div>
@@ -200,16 +193,13 @@ export default function Login() {
               fontSize: "18px",
               border: "none",
               cursor: loading ? "not-allowed" : "pointer",
-              transition: "all 0.2s",
-              marginTop: "8px",
               opacity: loading ? 0.6 : 1,
-              boxShadow: loading ? "none" : "0 8px 20px rgba(0, 229, 255, 0.3)",
             }}
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
 
-          <p style={{ textAlign: "center", color: "#a0a0a0", marginTop: "16px" }}>
+          <p style={{ textAlign: "center", color: "#a0a0a0" }}>
             Não tem conta?{" "}
             <Link
               to="/register"
