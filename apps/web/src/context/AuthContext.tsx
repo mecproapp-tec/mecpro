@@ -1,11 +1,12 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
 
 interface User {
   id: string;
   email: string;
   name: string;
-  officeName?: string;
+  officeName?: string | null;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -17,30 +18,40 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-
     if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        localStorage.removeItem('user');
+      }
     }
-
     setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });
+    const data = response.data;
 
-    const { accessToken, user } = response.data;
+    // A API retorna { accessToken, refreshToken, user }
+    const { accessToken, user } = data;
 
-    // ✅ PADRONIZAÇÃO TOTAL
+    if (!accessToken) {
+      console.error('Resposta da API sem accessToken:', data);
+      throw new Error('Token não recebido da API');
+    }
+    if (!user) {
+      throw new Error('Dados do usuário não recebidos');
+    }
+
     localStorage.setItem('token', accessToken);
     localStorage.setItem('user', JSON.stringify(user));
-
     setUser(user);
   };
 
@@ -48,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    api.post('/auth/logout').catch(() => {});
   };
 
   return (
