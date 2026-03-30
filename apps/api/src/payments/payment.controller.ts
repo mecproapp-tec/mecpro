@@ -1,3 +1,4 @@
+// src/payments/payment.controller.ts
 import { Body, Controller, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
@@ -20,24 +21,21 @@ export class PaymentsController {
     const accessToken = this.configService.get('MP_ACCESS_TOKEN');
 
     const planData = {
-      reason: "Assinatura MecPro - 30 dias grátis",
+      reason: 'Assinatura MecPro - 30 dias grátis',
       auto_recurring: {
         frequency: 1,
-        frequency_type: "months",
+        frequency_type: 'months',
         transaction_amount: 1.00,
-        currency_id: "BRL",
+        currency_id: 'BRL',
         free_trial: {
           frequency: 30,
-          frequency_type: "days"
-        }
+          frequency_type: 'days',
+        },
       },
       payment_methods_allowed: {
-        payment_types: [
-          { id: "credit_card" },
-          { id: "debit_card" }
-        ]
+        payment_types: [{ id: 'credit_card' }, { id: 'debit_card' }],
       },
-      back_url: "https://www.mecpro.tec.br/cadastro?payment=success"
+      back_url: `${this.configService.get('FRONTEND_URL')}/cadastro?payment=success`,
     };
 
     try {

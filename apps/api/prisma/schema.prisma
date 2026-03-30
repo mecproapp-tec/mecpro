@@ -31,6 +31,8 @@ model PendingSubscription {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   status         String   @default("pending")
+  tenantId       String?           // 🔥 NOVO – ligação direta com o tenant
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id])
 
   @@index([email, status])
   @@index([status])
@@ -44,7 +46,7 @@ model Tenant {
   documentNumber         String                  @unique
   cep                    String
   address                String
-  email                  String
+  email                  String                  @unique  // 🔥 AGORA ÚNICO (para vínculo correto)
   phone                  String
   logoUrl                String?
   status                 TenantStatus            @default(ACTIVE)
@@ -63,6 +65,7 @@ model Tenant {
   scheduledNotifications ScheduledNotification[]
   subscriptions          Subscription[]
   users                  User[]
+  pendingSubscriptions   PendingSubscription[]   // 🔥 NOVA RELAÇÃO (opcional)
 
   @@index([status])
   @@index([email])

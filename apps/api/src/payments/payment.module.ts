@@ -1,3 +1,4 @@
+// src/payments/payment.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PaymentsController } from './payment.controller';
