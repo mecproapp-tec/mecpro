@@ -406,7 +406,7 @@ export class EstimatesService {
     if (documentText) message += `\n${documentText}`;
     if (addressText) message += `\n${addressText}`;
 
-    message += `\n\nSeu orçamento está pronto ✅\n\n🔗 Acesse aqui:\n${pdfUrl}\n\n🚗 Veículo: ${client.vehicle || 'Não informado'}\n💰 Total: R$ ${estimate.total.toFixed(2)}\n📌 Status: ${estimate.status === 'DRAFT' ? 'Pendente' : estimate.status === 'APPROVED' ? 'Aceito' : 'Convertido'}`;
+    message += `\n\nSeu orçamento está pronto ✅\n\n${pdfUrl}\n\n🚗 Veículo: ${client.vehicle || 'Não informado'}\n💰 Total: R$ ${estimate.total.toFixed(2)}\n📌 Status: ${estimate.status === 'DRAFT' ? 'Pendente' : estimate.status === 'APPROVED' ? 'Aceito' : 'Convertido'}`;
 
     return message;
   }

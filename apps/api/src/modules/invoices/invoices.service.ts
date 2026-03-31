@@ -406,8 +406,8 @@ export class InvoicesService {
     if (documentText) message += `\n${documentText}`;
     if (addressText) message += `\n${addressText}`;
 
-    message += `\n\nSua fatura ${invoice.number} está pronta ✅\n\n🔗 Acesse aqui:\n${pdfUrl}\n\n💰 Total: R$ ${invoice.total.toFixed(2)}\n📌 Status: ${this.getStatusText(invoice.status)}`;
-
+    
+message += `\n\nSua fatura está pronta ✅\n\n${pdfUrl}\n\n💰 Total: R$ ${invoice.total}`;
     return message;
   }
 
