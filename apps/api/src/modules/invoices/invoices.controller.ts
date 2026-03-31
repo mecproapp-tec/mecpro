@@ -52,13 +52,11 @@ export class InvoicesController {
       req.user.tenantId,
       req.user.role,
     );
-
-    const apiBase = (process.env.API_URL || process.env.APP_URL || 'https://api.mecpro.tec.br').replace(/\/api$/, '');
-    const url = `${apiBase}/api/public/invoices/share/${token}`;
-    return { url, token };
+    const baseUrl = (process.env.APP_URL || 'https://api.mecpro.tec.br').replace(/\/$/, '');
+    const url = `${baseUrl}/api/public/invoices/share/${token}`;
+    return { url };
   }
 
-  // 🆕 Endpoint para enviar fatura via WhatsApp
   @Post(':id/send-whatsapp')
   async sendViaWhatsApp(
     @Param('id') id: string,
@@ -81,7 +79,9 @@ export class PublicInvoicesController {
   @Public()
   @Get('share/:token')
   async getSharedPdf(@Param('token') token: string, @Res() res: Response) {
-    if (!token) return res.status(400).send('Token não fornecido');
+    if (!token) {
+      return res.status(400).send('Token não fornecido');
+    }
 
     try {
       const pdfBuffer = await this.invoicesService.getPdfByShareToken(token);
