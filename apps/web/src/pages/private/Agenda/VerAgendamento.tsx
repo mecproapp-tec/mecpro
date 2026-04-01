@@ -18,6 +18,17 @@ const VerAgendamento: React.FC = () => {
     enabled: !!id,
   });
 
+  // 🔙 FUNÇÃO INTELIGENTE DE VOLTAR
+  const handleBack = () => {
+    // Se tiver histórico, volta
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      // fallback seguro
+      navigate('/clientes');
+    }
+  };
+
   if (isLoading) {
     return (
       <div style={styles.loadingContainer}>
@@ -30,8 +41,8 @@ const VerAgendamento: React.FC = () => {
     return (
       <div style={styles.errorContainer}>
         <p style={styles.error}>Erro ao carregar agendamento. Tente novamente.</p>
-        <button onClick={() => navigate('/clientes')} style={styles.backButton}>
-          Voltar para clientes
+        <button onClick={handleBack} style={styles.backButton}>
+          Voltar
         </button>
       </div>
     );
@@ -48,7 +59,7 @@ const VerAgendamento: React.FC = () => {
     <div style={styles.container}>
       <div style={styles.innerContainer}>
         <div style={styles.header}>
-          <button onClick={() => navigate(`/clientes/ver/${appointment.clientId}`)} style={styles.backIcon}>
+          <button onClick={handleBack} style={styles.backIcon}>
             <FiArrowLeft size={24} />
           </button>
           <h1 style={styles.title}>Detalhes do Agendamento</h1>
@@ -75,7 +86,9 @@ const VerAgendamento: React.FC = () => {
             <FiFileText size={20} style={styles.icon} />
             <div>
               <div style={styles.label}>Observações</div>
-              <div style={styles.value}>{appointment.comment || 'Nenhuma observação'}</div>
+              <div style={styles.value}>
+                {appointment.comment || 'Nenhuma observação'}
+              </div>
             </div>
           </div>
         </div>
