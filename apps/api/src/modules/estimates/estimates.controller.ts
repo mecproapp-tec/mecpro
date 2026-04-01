@@ -88,10 +88,13 @@ export class PublicEstimatesController {
     }
 
     try {
-      const pdfBuffer = await this.estimatesService.getPdfByShareToken(token);
+      const result = await this.estimatesService.getPdfByShareToken(token);
+      if (result.pdfUrl) {
+        return res.redirect(result.pdfUrl);
+      }
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline; filename=orcamento.pdf');
-      return res.send(pdfBuffer);
+      return res.send(result.pdfBuffer);
     } catch (error) {
       if (error.message === 'Token inválido' || error.message === 'Token expirado') {
         return res.status(404).send('Link inválido ou expirado');

@@ -154,7 +154,12 @@ export class EstimatesService {
     return estimate;
   }
 
-  async update(id: number, tenantId: string, data: { clientId: number; date: string; items: any[]; status?: string }, userRole?: string) {
+  async update(
+    id: number,
+    tenantId: string,
+    data: { clientId: number; date: string; items: any[]; status?: string },
+    userRole?: string,
+  ) {
     await this.findOne(id, tenantId, userRole);
     await this.prisma.estimateItem.deleteMany({ where: { estimateId: id } });
 
@@ -235,6 +240,8 @@ export class EstimatesService {
         total: true,
         status: true,
         shareTokenExpires: true,
+        pdfUrl: true,
+        pdfStatus: true,
         client: {
           select: {
             id: true,
@@ -266,8 +273,18 @@ export class EstimatesService {
     return estimate;
   }
 
-  async getPdfByShareToken(token: string): Promise<Buffer> {
+  async getPdfByShareToken(token: string): Promise<{ pdfUrl?: string; pdfBuffer: Buffer }> {
     const estimate = await this.validateShareToken(token);
+
+    if (estimate.pdfUrl) {
+      try {
+        const pdfBuffer = await this.storageService.get(estimate.pdfUrl);
+        return { pdfUrl: estimate.pdfUrl, pdfBuffer };
+      } catch (err) {
+        this.logger.warn(`Erro ao buscar PDF do R2: ${err.message}. Gerando novo.`);
+      }
+    }
+
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: estimate.tenantId },
       select: {
@@ -278,21 +295,23 @@ export class EstimatesService {
         logoUrl: true,
       },
     });
-    try {
-      const pdf = await this.estimatesPdfService.generateEstimatePdf(estimate, tenant);
-      return pdf;
-    } catch (err) {
-      this.logger.error(`Erro ao gerar PDF por token: ${err.message}`);
-      throw err;
-    }
+
+    const pdfBuffer = await this.estimatesPdfService.generateEstimatePdf(estimate, tenant);
+    const key = `${estimate.tenantId}/estimates/${estimate.id}.pdf`;
+    const pdfUrl = await this.storageService.upload(pdfBuffer, key);
+
+    await this.prisma.estimate.update({
+      where: { id: estimate.id },
+      data: {
+        pdfUrl,
+        pdfStatus: 'generated',
+        pdfGeneratedAt: new Date(),
+      },
+    });
+
+    return { pdfUrl, pdfBuffer };
   }
 
-  /**
-   * Envia o orçamento via WhatsApp.
-   * Sempre gera um token de compartilhamento (se expirado ou ausente) e retorna o link
-   * público do PDF junto com o link do WhatsApp.
-   * Se o PDF ainda não foi gerado, enfileira a geração assíncrona.
-   */
   async sendViaWhatsApp(
     id: number,
     tenantId: string,
@@ -314,19 +333,15 @@ export class EstimatesService {
       throw new BadRequestException('Cliente não possui telefone cadastrado');
     }
 
-    // 1. Gerar token de compartilhamento (ou reutilizar se válido)
     let token = estimate.shareToken;
     if (!token || (estimate.shareTokenExpires && new Date() > estimate.shareTokenExpires)) {
       token = await this.generateShareToken(estimate.id, tenantId, userRole);
     }
 
-    // 2. Construir URL pública do PDF
     const apiBase = (process.env.API_URL || process.env.APP_URL || 'https://api.mecpro.tec.br').replace(/\/api$/, '');
     const pdfUrl = `${apiBase}/api/public/estimates/share/${token}`;
 
-    // 3. Se o PDF ainda não foi gerado, enfileira a geração assíncrona (não bloqueia o envio)
     if (!estimate.pdfUrl || estimate.pdfStatus !== 'generated') {
-      // Prepara os dados para o processador da fila
       const tenant = estimate.tenant;
       const effectiveTenant = workshopData
         ? {
@@ -353,18 +368,20 @@ export class EstimatesService {
         issueDate: new Date(estimate.date).toLocaleDateString('pt-BR'),
         validUntil: new Date(new Date(estimate.date).getTime() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR'),
         status: estimate.status === 'DRAFT' ? 'Pendente' : estimate.status === 'APPROVED' ? 'Aceito' : 'Convertido',
-        items: estimate.items.map(item => ({
+        items: estimate.items.map((item) => ({
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.price.toFixed(2),
           issPercent: item.issPercent || 0,
           total: item.total.toFixed(2),
         })),
-        subtotal: estimate.items.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2),
-        issValue: estimate.items.reduce((acc, item) => {
-          const iss = item.issPercent ? item.price * (item.issPercent / 100) * item.quantity : 0;
-          return acc + iss;
-        }, 0).toFixed(2),
+        subtotal: estimate.items.reduce((acc, item) => acc + item.price * item.quantity, 0).toFixed(2),
+        issValue: estimate.items
+          .reduce((acc, item) => {
+            const iss = item.issPercent ? item.price * (item.issPercent / 100) * item.quantity : 0;
+            return acc + iss;
+          }, 0)
+          .toFixed(2),
         total: estimate.total.toFixed(2),
         companyName: effectiveTenant.name || 'Oficina Mecânica',
         companyDocument: effectiveTenant.documentNumber || '00.000.000/0001-00',
@@ -379,23 +396,18 @@ export class EstimatesService {
         data: estimateData,
       });
 
-      // Marca como pendente para não enfileirar novamente
       await this.prisma.estimate.update({
         where: { id, tenantId },
         data: { pdfStatus: 'pending' },
       });
     }
 
-    // 4. Construir mensagem do WhatsApp com o link público
     const message = this.buildWhatsAppMessage(estimate, pdfUrl);
     const whatsappLink = this.whatsappService.generateWhatsAppLink(client.phone, message);
 
     return { whatsappLink, pdfUrl };
   }
 
-  /**
-   * Constrói a mensagem do WhatsApp com os dados do cliente e o link do PDF.
-   */
   private buildWhatsAppMessage(estimate: any, pdfUrl: string): string {
     const client = estimate.client;
     const documentText = client.document ? `📄 Documento: ${client.document}` : '';

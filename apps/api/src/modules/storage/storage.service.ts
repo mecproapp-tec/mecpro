@@ -1,51 +1,74 @@
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
-import { writeFile, mkdir, access, readFile } from 'fs/promises';
-import { join } from 'path';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { ConfigService } from '@nestjs/config';
+import { Readable } from 'stream';
 
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
-  private readonly basePath: string;
+  private s3: S3Client;
+  private bucket: string;
+  private publicBaseUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.basePath = this.configService.get('LOCAL_STORAGE_PATH') || '/app/uploads';
-    this.init().catch(err => this.logger.error('Falha ao criar diretório de uploads', err));
-  }
+    const accountId = this.configService.get<string>('CLOUDFLARE_ACCOUNT_ID');
+    const accessKeyId = this.configService.get<string>('CLOUDFLARE_R2_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>('CLOUDFLARE_R2_SECRET_ACCESS_KEY');
+    this.bucket = this.configService.get<string>('CLOUDFLARE_R2_BUCKET_NAME');
+    this.publicBaseUrl = this.configService.get<string>('CLOUDFLARE_R2_PUBLIC_URL');
 
-  private async init() {
-    try {
-      await access(this.basePath);
-      this.logger.log(`Diretório de uploads já existe: ${this.basePath}`);
-    } catch {
-      await mkdir(this.basePath, { recursive: true });
-      this.logger.log(`Diretório de uploads criado: ${this.basePath}`);
+    if (!accountId || !accessKeyId || !secretAccessKey || !this.bucket || !this.publicBaseUrl) {
+      this.logger.error('Cloudflare R2 credentials not fully configured');
+      throw new Error('Cloudflare R2 credentials missing');
     }
+
+    this.s3 = new S3Client({
+      region: 'auto',
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
   }
 
   async upload(buffer: Buffer, key: string): Promise<string> {
     try {
-      const fullPath = join(this.basePath, key);
-      const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
-      await mkdir(dir, { recursive: true });
-      await writeFile(fullPath, buffer);
-      this.logger.log(`Arquivo salvo localmente: ${fullPath}`);
-      return key; // retorna a chave (caminho relativo) para referência
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: 'application/pdf',
+      });
+      await this.s3.send(command);
+      const publicUrl = `${this.publicBaseUrl}/${key}`;
+      this.logger.log(`Arquivo enviado para R2: ${publicUrl}`);
+      return publicUrl;
     } catch (error) {
-      this.logger.error(`Erro ao salvar arquivo localmente: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Falha ao salvar PDF');
+      this.logger.error(`Erro ao fazer upload para R2: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Falha ao salvar PDF no armazenamento');
     }
   }
 
-  async get(key: string): Promise<Buffer> {
+  async get(url: string): Promise<Buffer> {
     try {
-      const fullPath = join(this.basePath, key);
-      const buffer = await readFile(fullPath);
-      this.logger.log(`Arquivo lido localmente: ${fullPath}`);
+      const key = url.replace(`${this.publicBaseUrl}/`, '');
+      const command = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+      const response = await this.s3.send(command);
+      const stream = response.Body as Readable;
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      this.logger.log(`Arquivo baixado do R2: ${url}`);
       return buffer;
     } catch (error) {
-      this.logger.error(`Erro ao ler arquivo local: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Falha ao recuperar PDF');
+      this.logger.error(`Erro ao ler arquivo do R2: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Falha ao recuperar PDF do armazenamento');
     }
   }
 }

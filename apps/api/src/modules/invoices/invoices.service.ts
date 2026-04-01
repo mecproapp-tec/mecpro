@@ -298,11 +298,19 @@ export class InvoicesService {
     return invoice;
   }
 
-  async getPdfByShareToken(token: string): Promise<Buffer> {
+  async getPdfByShareToken(token: string): Promise<{ pdfUrl?: string; pdfBuffer: Buffer }> {
     this.logger.log(`getPdfByShareToken chamado para token: ${token}`);
     try {
       const invoice = await this.validateShareToken(token);
-      this.logger.log(`Token válido para fatura ${invoice.id}`);
+
+      if (invoice.pdfUrl) {
+        try {
+          const pdfBuffer = await this.storageService.get(invoice.pdfUrl);
+          return { pdfUrl: invoice.pdfUrl, pdfBuffer };
+        } catch (error) {
+          this.logger.warn(`Erro ao recuperar PDF do R2: ${error.message}. Gerando novo.`);
+        }
+      }
 
       const tenant = await this.prisma.tenant.findUnique({
         where: { id: invoice.tenantId },
@@ -314,7 +322,6 @@ export class InvoicesService {
           logoUrl: true,
         },
       });
-      this.logger.log(`Tenant encontrado: ${tenant?.name || 'não encontrado'}`);
 
       if (!invoice.client || !invoice.client.id) {
         throw new BadRequestException('Fatura sem cliente associado');
@@ -323,31 +330,21 @@ export class InvoicesService {
         throw new BadRequestException('Fatura sem itens');
       }
 
-      if (invoice.pdfUrl && invoice.pdfStatus === 'generated') {
-        try {
-          const pdfBuffer = await this.storageService.get(invoice.pdfUrl);
-          this.logger.log(`PDF recuperado do storage local, tamanho: ${pdfBuffer.length}`);
-          return pdfBuffer;
-        } catch (error) {
-          this.logger.warn(`Erro ao buscar PDF do storage: ${error.message}. Gerando novo.`);
-        }
-      }
-
       const pdfBuffer = await this.invoicesPdfService.generateInvoicePdf(invoice, tenant);
       const key = `${invoice.tenantId}/invoices/${invoice.id}.pdf`;
-      const savedKey = await this.storageService.upload(pdfBuffer, key);
+      const pdfUrl = await this.storageService.upload(pdfBuffer, key);
 
       await this.prisma.invoice.update({
         where: { id: invoice.id },
         data: {
-          pdfUrl: savedKey,
+          pdfUrl,
           pdfStatus: 'generated',
           pdfGeneratedAt: new Date(),
         },
       });
 
       this.logger.log(`PDF gerado e salvo, tamanho: ${pdfBuffer.length}`);
-      return pdfBuffer;
+      return { pdfUrl, pdfBuffer };
     } catch (error) {
       this.logger.error(`Erro em getPdfByShareToken:`, error.stack);
       if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
@@ -357,7 +354,6 @@ export class InvoicesService {
     }
   }
 
-  // 🆕 Método para enviar fatura via WhatsApp (similar ao orçamento)
   async sendViaWhatsApp(
     id: number,
     tenantId: string,
@@ -379,7 +375,6 @@ export class InvoicesService {
       throw new BadRequestException('Cliente não possui telefone cadastrado');
     }
 
-    // Gera token de compartilhamento (se necessário)
     let token = invoice.shareToken;
     if (!token || (invoice.shareTokenExpires && new Date() > invoice.shareTokenExpires)) {
       token = await this.generateShareToken(invoice.id, tenantId, userRole);
@@ -388,14 +383,12 @@ export class InvoicesService {
     const apiBase = (process.env.API_URL || process.env.APP_URL || 'https://api.mecpro.tec.br').replace(/\/api$/, '');
     const pdfUrl = `${apiBase}/api/public/invoices/share/${token}`;
 
-    // Mensagem com documento e endereço
     const message = this.buildWhatsAppMessage(invoice, pdfUrl);
     const whatsappLink = this.whatsappService.generateWhatsAppLink(client.phone, message);
 
     return { whatsappLink, message, pdfUrl };
   }
 
-  // 🟢 Mensagem do WhatsApp agora inclui documento e endereço do cliente
   private buildWhatsAppMessage(invoice: any, pdfUrl: string): string {
     const client = invoice.client;
     const documentText = client.document ? `📄 Documento: ${client.document}` : '';
@@ -406,8 +399,7 @@ export class InvoicesService {
     if (documentText) message += `\n${documentText}`;
     if (addressText) message += `\n${addressText}`;
 
-    
-message += `\n\nSua fatura está pronta ✅\n\n${pdfUrl}\n\n💰 Total: R$ ${invoice.total}`;
+    message += `\n\nSua fatura está pronta ✅\n\n${pdfUrl}\n\n💰 Total: R$ ${invoice.total}`;
     return message;
   }
 
