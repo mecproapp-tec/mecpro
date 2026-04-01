@@ -77,9 +77,9 @@ export default function Agendamento() {
     setSaving(true);
     try {
       const localDate = new Date(`${data}T${hora}:00`);
-const dateTime = new Date(
-  localDate.getTime() - localDate.getTimezoneOffset() * 60000
-).toISOString();
+      const dateTime = new Date(
+        localDate.getTime() - localDate.getTimezoneOffset() * 60000
+      ).toISOString();
 
       await createAppointment({
         clientId: cliente.id,
@@ -88,7 +88,8 @@ const dateTime = new Date(
       });
 
       alert("Agendamento salvo com sucesso");
-      navigate("/agenda");
+      // 🔁 Redireciona para a página de detalhes do cliente (rota válida)
+      navigate(`/clientes/ver/${cliente.id}`);
     } catch (err: any) {
       alert(err.response?.data?.message || "Erro ao salvar agendamento");
     } finally {
