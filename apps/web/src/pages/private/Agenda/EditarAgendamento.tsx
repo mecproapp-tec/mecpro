@@ -25,13 +25,10 @@ export default function EditarAgendamento() {
       const app = await getAppointmentById(Number(id));
       setAgendamento(app);
 
-      // 🔥 backend já vem no horário do Brasil
       const dateObj = new Date(app.date);
-
       const year = dateObj.getFullYear();
       const month = String(dateObj.getMonth() + 1).padStart(2, "0");
       const day = String(dateObj.getDate()).padStart(2, "0");
-
       const hour = String(dateObj.getHours()).padStart(2, "0");
       const minute = String(dateObj.getMinutes()).padStart(2, "0");
 
@@ -54,7 +51,6 @@ export default function EditarAgendamento() {
       return;
     }
 
-    // 🔥 NÃO usa toISOString nem conversão
     const dateTime = `${data}T${hora}:00`;
 
     setSaving(true);
@@ -66,7 +62,7 @@ export default function EditarAgendamento() {
       });
 
       alert("Agendamento atualizado com sucesso");
-      navigate("/agendamentos"); // ajuste sua rota se necessário
+      navigate(`/clientes/ver/${agendamento.clientId}`);
     } catch (err: any) {
       alert(err.response?.data?.message || "Erro ao atualizar agendamento");
     } finally {

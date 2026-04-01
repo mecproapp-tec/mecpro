@@ -6,7 +6,6 @@ import { createAppointment } from "../../../services/appointments";
 
 const BRAZIL_TIMEZONE = 'America/Sao_Paulo';
 
-// Retorna a data/hora atual no horário de Brasília
 const getBrazilNow = (): Date => {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('pt-BR', {
@@ -65,7 +64,6 @@ export default function Agendamento() {
       return;
     }
 
-    // Constrói a data no horário de Brasília
     const selected = new Date(`${data}T${hora}:00`);
     const nowBrazil = getBrazilNow();
 
@@ -88,7 +86,6 @@ export default function Agendamento() {
       });
 
       alert("Agendamento salvo com sucesso");
-      // 🔁 Redireciona para a página de detalhes do cliente (rota válida)
       navigate(`/clientes/ver/${cliente.id}`);
     } catch (err: any) {
       alert(err.response?.data?.message || "Erro ao salvar agendamento");
