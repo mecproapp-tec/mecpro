@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import * as puppeteer from 'puppeteer';
+import * as puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 @Injectable()
 export class BrowserPoolService implements OnModuleDestroy {
@@ -18,21 +19,16 @@ export class BrowserPoolService implements OnModuleDestroy {
     this.isLaunching = true;
 
     try {
+      const executablePath = await chromium.executablePath;
+
       this.browser = await puppeteer.launch({
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-        ],
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath,
+        headless: chromium.headless,
       });
 
-      this.logger.log('Browser launched');
+      this.logger.log('Browser launched (Vercel)');
       return this.browser;
     } catch (error) {
       this.logger.error('Erro ao iniciar Puppeteer', error);
