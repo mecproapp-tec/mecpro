@@ -6,7 +6,6 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
-import { EstimateStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { EstimatesPdfService } from './estimates-pdf.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
@@ -103,6 +102,10 @@ export class EstimatesService {
     id: number,
     tenantId: string,
   ): Promise<{ whatsappLink: string; pdfUrl: string }> {
+
+    // 🔥 LOG PRA VALIDAR DEPLOY
+    this.logger.log('🔥 NOVA VERSÃO SEM FILA ATIVA');
+
     const estimate = await this.prisma.estimate.findFirst({
       where: { id, tenantId },
       include: {
@@ -127,11 +130,12 @@ export class EstimatesService {
     }
 
     const apiBase = (process.env.API_URL || '').replace(/\/api$/, '');
-
     const pdfPublicUrl = `${apiBase}/api/public/estimates/share/${token}`;
 
-    // 🔥 GERA PDF NA HORA (SEM FILA)
+    // 🔥 GERA PDF NA HORA (SEM FILA - CORRIGIDO)
     if (!estimate.pdfUrl || estimate.pdfStatus !== 'generated') {
+      this.logger.log('🔥 GERANDO PDF AGORA...');
+
       const pdfBuffer = await this.estimatesPdfService.generateEstimatePdf(
         estimate,
         estimate.tenant,
@@ -149,6 +153,8 @@ export class EstimatesService {
           pdfGeneratedAt: new Date(),
         },
       });
+
+      this.logger.log('✅ PDF GERADO E SALVO');
     }
 
     const message = this.buildWhatsAppMessage(estimate, pdfPublicUrl);
