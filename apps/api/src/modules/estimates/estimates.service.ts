@@ -1,18 +1,15 @@
-// C:\Users\admco\OneDrive\Escritorio\MecPro\apps\api\src\modules\estimates\estimates.service.ts
-
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
   UnauthorizedException,
   Logger,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { randomBytes } from 'crypto';
-import { EstimatesPdfService } from './estimates-pdf.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
-import { StorageService } from '../storage/storage.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class EstimatesService {
@@ -20,365 +17,179 @@ export class EstimatesService {
 
   constructor(
     private prisma: PrismaService,
-    private estimatesPdfService: EstimatesPdfService,
     private whatsappService: WhatsappService,
-    private storageService: StorageService,
+
+    @InjectQueue('pdf')
+    private pdfQueue: Queue,
   ) {}
 
-  // -------------------------------------------------------------------------
-  // Métodos CRUD
-  // -------------------------------------------------------------------------
-  async create(tenantId: string, data: any) {
-    const { clientId, date, items } = data;
-    if (!items || items.length === 0) {
-      throw new BadRequestException('Orçamento deve ter pelo menos um item.');
-    }
-    const client = await this.prisma.client.findFirst({
-      where: { id: clientId, tenantId },
+  private calculateItems(items: any[]) {
+    let total = 0;
+
+    const normalized = items.map((item) => {
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 1;
+      const iss = item.issPercent ? price * (item.issPercent / 100) : 0;
+      const itemTotal = (price + iss) * quantity;
+
+      total += itemTotal;
+
+      return {
+        description: item.description,
+        price,
+        quantity,
+        issPercent: item.issPercent,
+        total: itemTotal,
+      };
     });
+
+    return { items: normalized, total };
+  }
+
+  async create(tenantId: string, data: any) {
+    if (!data.items?.length) {
+      throw new BadRequestException('Orçamento sem itens');
+    }
+
+    const client = await this.prisma.client.findFirst({
+      where: { id: data.clientId, tenantId },
+    });
+
     if (!client) throw new NotFoundException('Cliente não encontrado');
 
-    const itemsWithTotal = items.map((item) => {
-      const iss = item.issPercent ? item.price * (item.issPercent / 100) : 0;
-      const total = (item.price + iss) * item.quantity;
-      return { ...item, total };
-    });
-    const total = itemsWithTotal.reduce((acc, item) => acc + item.total, 0);
+    const { items, total } = this.calculateItems(data.items);
 
-    return this.prisma.estimate.create({
+    const estimate = await this.prisma.estimate.create({
       data: {
         tenantId,
-        clientId,
-        date: new Date(date),
+        clientId: data.clientId,
+        date: new Date(data.date),
         total,
-        items: { create: itemsWithTotal },
+        status: 'DRAFT',
+        items: { create: items },
       },
-      include: { items: true, client: true },
+      include: { items: true, client: true, tenant: true },
     });
-  }
 
-  async findAll(tenantId: string, userRole?: string) {
-    const where: any = {};
-    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
-      where.tenantId = tenantId;
-    }
-    return this.prisma.estimate.findMany({
-      where,
-      select: {
-        id: true,
-        clientId: true,
-        date: true,
-        total: true,
-        status: true,
-        pdfUrl: true,
-        pdfStatus: true,
-        createdAt: true,
-        client: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            vehicle: true,
-            plate: true,
-          },
-        },
-        items: {
-          select: {
-            id: true,
-            description: true,
-            quantity: true,
-            price: true,
-            total: true,
-            issPercent: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
+    await this.pdfQueue.add('generate-pdf', {
+      tenantId,
+      entityId: estimate.id,
+      entityType: 'estimate',
+      data: estimate,
     });
-  }
 
-  async findOne(id: number, tenantId: string, userRole?: string) {
-    const where: any = { id };
-    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
-      where.tenantId = tenantId;
-    }
-    const estimate = await this.prisma.estimate.findFirst({
-      where,
-      select: {
-        id: true,
-        clientId: true,
-        date: true,
-        total: true,
-        status: true,
-        pdfUrl: true,
-        pdfStatus: true,
-        pdfGeneratedAt: true,
-        createdAt: true,
-        shareToken: true,
-        shareTokenExpires: true,
-        client: {
-          select: {
-            id: true,
-            name: true,
-            phone: true,
-            vehicle: true,
-            plate: true,
-            address: true,
-            document: true,
-          },
-        },
-        items: {
-          select: {
-            id: true,
-            description: true,
-            quantity: true,
-            price: true,
-            total: true,
-            issPercent: true,
-          },
-        },
-      },
-    });
-    if (!estimate) throw new NotFoundException('Orçamento não encontrado');
     return estimate;
   }
 
-  async update(id: number, tenantId: string, updateData: any, userRole?: string) {
-    await this.findOne(id, tenantId, userRole);
-    if (updateData.clientId) {
-      const client = await this.prisma.client.findFirst({
-        where: { id: updateData.clientId, tenantId },
-      });
-      if (!client) throw new NotFoundException('Cliente não encontrado');
-    }
-    if (updateData.items && updateData.items.length > 0) {
-      await this.prisma.estimateItem.deleteMany({ where: { estimateId: id } });
-      const itemsWithTotal = updateData.items.map((item) => {
-        const iss = item.issPercent ? item.price * (item.issPercent / 100) : 0;
-        const total = (item.price + iss) * item.quantity;
-        return { ...item, total };
-      });
-      const total = itemsWithTotal.reduce((acc, item) => acc + item.total, 0);
-      const dataToUpdate: any = {
-        clientId: updateData.clientId,
-        date: updateData.date ? new Date(updateData.date) : undefined,
-        total,
-        items: { create: itemsWithTotal },
-      };
-      if (updateData.status) dataToUpdate.status = updateData.status;
-      return this.prisma.estimate.update({
-        where: { id },
-        data: dataToUpdate,
-        include: { items: true, client: true },
-      });
-    }
-    const dataToUpdate: any = {};
-    if (updateData.clientId) dataToUpdate.clientId = updateData.clientId;
-    if (updateData.date) dataToUpdate.date = new Date(updateData.date);
-    if (updateData.status) dataToUpdate.status = updateData.status;
-    return this.prisma.estimate.update({
-      where: { id },
-      data: dataToUpdate,
-      include: { items: true, client: true },
-    });
-  }
-
-  async remove(id: number, tenantId: string, userRole?: string) {
-    await this.findOne(id, tenantId, userRole);
-    await this.prisma.estimateItem.deleteMany({ where: { estimateId: id } });
-    await this.prisma.estimate.delete({ where: { id } });
-    return { message: 'Orçamento removido com sucesso' };
-  }
-
-  // -------------------------------------------------------------------------
-  // Métodos para compartilhamento e PDF
-  // -------------------------------------------------------------------------
-  async generateShareToken(id: number, tenantId: string, userRole?: string): Promise<string> {
-    this.logger.log(`generateShareToken chamado para orçamento ${id}, tenant ${tenantId}`);
+  async findOne(id: number, tenantId: string, role?: string) {
     const where: any = { id };
-    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
+
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role || '')) {
       where.tenantId = tenantId;
     }
-    const estimate = await this.prisma.estimate.findFirst({ where });
+
+    const estimate = await this.prisma.estimate.findFirst({
+      where,
+      include: {
+        client: true,
+        items: true,
+      },
+    });
+
     if (!estimate) throw new NotFoundException('Orçamento não encontrado');
+
+    return estimate;
+  }
+
+  async generateShareToken(id: number, tenantId: string, role?: string) {
+    const estimate = await this.findOne(id, tenantId, role);
 
     if (
       estimate.shareToken &&
       estimate.shareTokenExpires &&
       new Date() < estimate.shareTokenExpires
     ) {
-      this.logger.log(`Token existente e válido: ${estimate.shareToken}`);
       return estimate.shareToken;
     }
 
     const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
 
     await this.prisma.estimate.update({
       where: { id },
       data: {
         shareToken: token,
-        shareTokenExpires: expiresAt,
+        shareTokenExpires: new Date(Date.now() + 7 * 86400000),
       },
     });
 
-    this.logger.log(`Novo token gerado: ${token}`);
     return token;
   }
 
-  async validateShareToken(token: string) {
+  async getPdfByShareToken(token: string) {
     const estimate = await this.prisma.estimate.findFirst({
       where: { shareToken: token },
-      include: {
-        client: true,
-        items: true,
-        tenant: true,
-      },
+      include: { client: true, items: true, tenant: true },
     });
+
     if (!estimate) throw new UnauthorizedException('Token inválido');
+
     if (estimate.shareTokenExpires && new Date() > estimate.shareTokenExpires) {
       throw new UnauthorizedException('Token expirado');
     }
-    return estimate;
-  }
 
-  async getPdfByShareToken(token: string): Promise<{ pdfUrl?: string; pdfBuffer: Buffer }> {
-    this.logger.log(`getPdfByShareToken chamado para token: ${token}`);
-    try {
-      const estimate = await this.validateShareToken(token);
-
-      if (estimate.pdfUrl) {
-        try {
-          const pdfBuffer = await this.storageService.get(estimate.pdfUrl);
-          return { pdfUrl: estimate.pdfUrl, pdfBuffer };
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          this.logger.warn(`Erro ao recuperar PDF do R2: ${errorMessage}. Gerando novo.`);
-        }
-      }
-
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: estimate.tenantId },
-        select: {
-          name: true,
-          documentNumber: true,
-          phone: true,
-          email: true,
-          logoUrl: true,
-        },
-      });
-      if (!tenant) throw new BadRequestException('Dados da oficina não encontrados');
-
-      const pdfBuffer = await this.estimatesPdfService.generateEstimatePdf(estimate, tenant);
-      const key = `${estimate.tenantId}/estimates/${estimate.id}.pdf`;
-      const pdfUrl = await this.storageService.upload(pdfBuffer, key);
-
-      await this.prisma.estimate.update({
-        where: { id: estimate.id },
-        data: {
-          pdfUrl,
-          pdfStatus: 'generated',
-          pdfGeneratedAt: new Date(),
-        },
-      });
-
-      this.logger.log(`PDF gerado e salvo: ${pdfUrl}`);
-      return { pdfUrl, pdfBuffer };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`Erro em getPdfByShareToken: ${errorMessage}`, errorStack);
-      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new InternalServerErrorException('Erro ao gerar PDF do orçamento');
-    }
-  }
-
-  async sendViaWhatsApp(
-    id: number,
-    tenantId: string,
-    workshopData?: any,
-    userRole?: string,
-  ): Promise<{ whatsappLink: string; pdfUrl: string }> {
-    this.logger.log(`sendViaWhatsApp iniciado para estimate ${id}`);
-
-    const where: any = { id };
-    if (userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN') {
-      where.tenantId = tenantId;
+    if (estimate.pdfUrl) {
+      return {
+        pdfUrl: estimate.pdfUrl,
+      };
     }
 
-    const estimate = await this.prisma.estimate.findFirst({
-      where,
-      include: {
-        client: true,
-        items: true,
-        tenant: true,
-      },
+    await this.pdfQueue.add('generate-pdf', {
+      tenantId: estimate.tenantId,
+      entityId: estimate.id,
+      entityType: 'estimate',
+      data: estimate,
     });
 
-    if (!estimate) throw new NotFoundException('Orçamento não encontrado');
-    if (!estimate.client.phone) throw new BadRequestException('Cliente sem telefone');
-
-    let token = estimate.shareToken;
-    if (!token || (estimate.shareTokenExpires && new Date() > estimate.shareTokenExpires)) {
-      token = await this.generateShareToken(id, tenantId, userRole);
-    }
-
-    const apiBase = process.env.API_URL
-      ? process.env.API_URL.replace(/\/api$/, '')
-      : 'https://api.mecpro.tec.br';
-    const pdfPublicUrl = `${apiBase}/api/public/estimates/share/${token}`;
-    this.logger.log(`Link público gerado: ${pdfPublicUrl}`);
-
-    if (!estimate.pdfUrl || estimate.pdfStatus !== 'generated') {
-      this.logger.log('Gerando PDF agora...');
-      const pdfBuffer = await this.estimatesPdfService.generateEstimatePdf(
-        estimate,
-        estimate.tenant,
-      );
-      const key = `${tenantId}/estimates/${id}.pdf`;
-      try {
-        const pdfUrl = await this.storageService.upload(pdfBuffer, key);
-        if (!pdfUrl) {
-          throw new Error('Upload retornou URL vazia');
-        }
-        await this.prisma.estimate.update({
-          where: { id },
-          data: {
-            pdfUrl,
-            pdfStatus: 'generated',
-            pdfGeneratedAt: new Date(),
-          },
-        });
-        this.logger.log(`✅ PDF gerado e salvo: ${pdfUrl}`);
-      } catch (uploadError: unknown) {
-        const errorMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
-        this.logger.error(`❌ Falha no upload do PDF: ${errorMessage}`);
-        throw new InternalServerErrorException('Não foi possível salvar o PDF. Contate o suporte.');
-      }
-    }
-
-    const message = this.buildWhatsAppMessage(estimate, pdfPublicUrl);
-    const whatsappLink = this.whatsappService.generateWhatsAppLink(
-      estimate.client.phone,
-      message,
-    );
-
-    return { whatsappLink, pdfUrl: pdfPublicUrl };
+    throw new BadRequestException('PDF ainda está sendo gerado');
   }
 
-  private buildWhatsAppMessage(estimate: any, pdfUrl: string): string {
-    const client = estimate.client;
-    const vehicle = client.vehicle || 'Não informado';
-    return `Olá ${client.name}!
+  async sendViaWhatsApp(id: number, tenantId: string, role?: string) {
+    const estimate = await this.findOne(id, tenantId, role);
+
+    if (!estimate.client.phone) {
+      throw new BadRequestException('Cliente sem telefone');
+    }
+
+    const token = await this.generateShareToken(id, tenantId, role);
+
+    const base =
+      process.env.API_URL?.replace('/api', '') ||
+      'https://api.mecpro.tec.br';
+
+    const link = `${base}/api/public/estimates/share/${token}`;
+
+    await this.pdfQueue.add('generate-pdf', {
+      tenantId: estimate.tenantId,
+      entityId: estimate.id,
+      entityType: 'estimate',
+      data: estimate,
+    });
+
+    const message = `Olá ${estimate.client.name}!
 
 Seu orçamento está pronto ✅
 
-${pdfUrl}
+${link}
 
-🚗 Veículo: ${vehicle}
 💰 Total: R$ ${estimate.total.toFixed(2)}`;
+
+    return {
+      whatsappLink: this.whatsappService.generateWhatsAppLink(
+        estimate.client.phone,
+        message,
+      ),
+      pdfUrl: link,
+      queued: true,
+    };
   }
 }

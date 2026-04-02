@@ -6,18 +6,33 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
   imports: [
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        connection: {
-          url: configService.get<string>('REDIS_URL'),
-        },
-        defaultJobOptions: {
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 1000 },
-          removeOnComplete: true,
-          removeOnFail: false,
-        },
-      }),
       inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const redisUrl = configService.get<string>('REDIS_URL');
+
+        if (!redisUrl) {
+          throw new Error('❌ REDIS_URL não definido no .env');
+        }
+
+        return {
+          connection: {
+            url: redisUrl,
+          },
+          defaultJobOptions: {
+            attempts: 5,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+            removeOnComplete: 100,
+            removeOnFail: false,
+          },
+        };
+      },
+    }),
+
+    BullModule.registerQueue({
+      name: 'pdf',
     }),
   ],
 })

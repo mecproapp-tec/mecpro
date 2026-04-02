@@ -1,6 +1,10 @@
 import axios from "axios";
 
-const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const baseUrl =
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.PROD
+    ? "https://api.mecpro.tec.br/api"
+    : "http://localhost:3000/api");
 const API_URL = baseUrl.replace(/\/$/, "");
 
 console.log("🔧 API_URL:", API_URL);

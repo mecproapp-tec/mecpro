@@ -101,3 +101,13 @@ export const getInvoiceByToken = async (token: string): Promise<Invoice> => {
   const response = await api.get(`/invoices/share/${token}`);
   return response.data;
 };
+
+
+// 🔗 Gerar link público correto (PRODUÇÃO)
+export const getInvoicePublicLink = (token: string): string => {
+  const base =
+    import.meta.env.VITE_API_URL?.replace(/\/api$/, "") ||
+    "https://api.mecpro.tec.br/api";
+
+  return `${base}/api/public/invoices/share/${token}`;
+};
