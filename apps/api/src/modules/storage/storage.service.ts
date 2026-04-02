@@ -16,16 +16,17 @@ import { Readable } from 'stream';
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
 
-  private s3: S3Client;
-  private bucket: string;
-  private publicBaseUrl: string;
+  private readonly s3: S3Client;
+  private readonly bucket: string;
+  private readonly publicBaseUrl: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(private readonly configService: ConfigService) {
     const accountId = this.configService.get<string>('CLOUDFLARE_ACCOUNT_ID');
     const accessKeyId = this.configService.get<string>('CLOUDFLARE_R2_ACCESS_KEY_ID');
     const secretAccessKey = this.configService.get<string>('CLOUDFLARE_R2_SECRET_ACCESS_KEY');
-    this.bucket = this.configService.get<string>('CLOUDFLARE_R2_BUCKET_NAME');
-    this.publicBaseUrl = this.configService.get<string>('CLOUDFLARE_R2_PUBLIC_URL');
+
+    this.bucket = this.configService.get<string>('CLOUDFLARE_R2_BUCKET_NAME')!;
+    this.publicBaseUrl = this.configService.get<string>('CLOUDFLARE_R2_PUBLIC_URL')!;
 
     if (!accountId || !accessKeyId || !secretAccessKey || !this.bucket || !this.publicBaseUrl) {
       this.logger.error('❌ Cloudflare R2 não configurado corretamente');
@@ -45,7 +46,7 @@ export class StorageService {
   }
 
   /**
-   * Upload de arquivo (PDF, imagem, etc)
+   * Upload de arquivo
    */
   async upload(
     buffer: Buffer,
@@ -53,28 +54,31 @@ export class StorageService {
     contentType = 'application/pdf',
   ): Promise<string> {
     try {
+      const cleanKey = key.replace(/^\/+/, '');
+
       const command = new PutObjectCommand({
         Bucket: this.bucket,
-        Key: key,
+        Key: cleanKey,
         Body: buffer,
         ContentType: contentType,
-
-        // 🔥 importante pra performance e cache
         CacheControl: 'public, max-age=31536000',
       });
 
       await this.s3.send(command);
 
-      const publicUrl = `${this.publicBaseUrl}/${key}`;
+      const publicUrl = `${this.publicBaseUrl}/${cleanKey}`;
 
       this.logger.log(`📤 Upload R2: ${publicUrl}`);
 
       return publicUrl;
     } catch (error) {
+      const err = error as Error;
+
       this.logger.error(
-        `❌ Erro upload R2: ${error.message}`,
-        error.stack,
+        `❌ Erro upload R2: ${err.message}`,
+        err.stack,
       );
+
       throw new InternalServerErrorException(
         'Falha ao salvar arquivo no armazenamento',
       );
@@ -82,7 +86,7 @@ export class StorageService {
   }
 
   /**
-   * Baixar arquivo do R2
+   * Baixar arquivo
    */
   async get(url: string): Promise<Buffer> {
     try {
@@ -99,24 +103,27 @@ export class StorageService {
 
       const response = await this.s3.send(command);
 
-      const stream = response.Body as Readable;
-
-      const chunks: Buffer[] = [];
-
-      for await (const chunk of stream) {
-        chunks.push(chunk);
+      if (!response.Body) {
+        throw new Error('Arquivo vazio ou não encontrado');
       }
 
-      const buffer = Buffer.concat(chunks);
+      const stream = response.Body as Readable;
 
-      this.logger.log(`📥 Download R2: ${url}`);
+      const chunks: Uint8Array[] = [];
 
-      return buffer;
+      for await (const chunk of stream) {
+        chunks.push(chunk as Uint8Array);
+      }
+
+      return Buffer.concat(chunks);
     } catch (error) {
+      const err = error as Error;
+
       this.logger.error(
-        `❌ Erro download R2: ${error.message}`,
-        error.stack,
+        `❌ Erro download R2: ${err.message}`,
+        err.stack,
       );
+
       throw new InternalServerErrorException(
         'Falha ao recuperar arquivo do armazenamento',
       );
@@ -124,7 +131,7 @@ export class StorageService {
   }
 
   /**
-   * Deletar arquivo (útil para SaaS)
+   * Deletar arquivo
    */
   async delete(url: string): Promise<void> {
     try {
@@ -143,10 +150,13 @@ export class StorageService {
 
       this.logger.log(`🗑️ Arquivo removido: ${url}`);
     } catch (error) {
+      const err = error as Error;
+
       this.logger.error(
-        `❌ Erro ao deletar arquivo: ${error.message}`,
-        error.stack,
+        `❌ Erro ao deletar arquivo: ${err.message}`,
+        err.stack,
       );
+
       throw new InternalServerErrorException(
         'Falha ao deletar arquivo',
       );
