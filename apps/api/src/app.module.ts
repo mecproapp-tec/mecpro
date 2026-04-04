@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule } from '@nestjs/bullmq';
 
 import { PrismaModule } from './shared/prisma/prisma.module';
 import { SharedModule } from './shared/shared.module';
@@ -22,17 +21,18 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { QueueModule } from './modules/common/queues/queue.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
-import { PdfModule } from './modules/pdf/pdf.module'; // <-- importe o PdfModule
+import { PdfModule } from './modules/pdf/pdf.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-
+import { PublicShareModule } from './modules/public-share/public-share.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    QueueModule,               // <-- se este módulo já configura o Bull, mantenha
-    BullModule.registerQueue({ name: 'pdf' }), // <-- se já configurado em QueueModule, pode remover
+
+    QueueModule, 
+    PublicShareModule,
     PrismaModule,
     SharedModule,
     AuthModule,
@@ -50,9 +50,9 @@ import { AppService } from './app.service';
     WhatsappModule,
     StorageModule,
     UsersModule,
-    PdfModule,                // <-- adicione o PdfModule
+    PdfModule,
   ],
   controllers: [AppController],
-  providers: [AppService],    // <-- remova o PdfProcessor daqui
+  providers: [AppService],
 })
 export class AppModule {}

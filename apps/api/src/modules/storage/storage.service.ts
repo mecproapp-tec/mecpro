@@ -1,8 +1,15 @@
-// C:\Users\admco\OneDrive\Escritorio\MecPro\apps\api\src\modules\storage\storage.service.ts
-
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class StorageService {
@@ -10,21 +17,33 @@ export class StorageService {
   private s3: S3Client;
   private bucket: string;
   private publicUrl: string;
+  private useFallback = false;
 
   constructor() {
     this.bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
     this.publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL!;
     const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-    const endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
 
-    if (!this.bucket || !this.publicUrl || !accountId) {
-      this.logger.error('Configuração do Cloudflare R2 incompleta. Verifique as variáveis de ambiente.');
-      throw new InternalServerErrorException('Storage service misconfigured');
+    const endpoint = accountId
+      ? `https://${accountId}.r2.cloudflarestorage.com`
+      : null;
+
+    // 🔥 validação segura
+    if (
+      !this.bucket ||
+      !this.publicUrl ||
+      !accountId ||
+      !process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ||
+      !process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY
+    ) {
+      this.logger.error('❌ R2 não configurado corretamente — usando fallback local');
+      this.useFallback = true;
+      return;
     }
 
     this.s3 = new S3Client({
       region: 'auto',
-      endpoint: endpoint,
+      endpoint,
       credentials: {
         accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
         secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
@@ -32,56 +51,76 @@ export class StorageService {
       forcePathStyle: true,
     });
 
-    this.logger.log(`StorageService inicializado com bucket: ${this.bucket}`);
+    this.logger.log(`✅ R2 conectado | Bucket: ${this.bucket}`);
   }
 
-  /**
-   * Faz upload de um buffer PDF para o R2 e retorna a URL pública completa.
-   * @param buffer Conteúdo do arquivo (PDF)
-   * @param key Caminho/chave no bucket (ex: "tenantId/estimates/123.pdf")
-   * @returns URL pública completa (ex: https://pub-....r2.dev/tenantId/estimates/123.pdf)
-   */
-  async upload(buffer: Buffer, key: string): Promise<string> {
-    if (!buffer || buffer.length === 0) {
-      throw new Error('Buffer inválido ou vazio');
+  // =========================
+  // 🔥 MÉTODO PADRÃO (USADO PELO SISTEMA)
+  // =========================
+  async upload(file: Buffer, key: string): Promise<string> {
+    if (!file || file.length === 0) {
+      throw new InternalServerErrorException('Arquivo inválido');
+    }
+
+    if (this.useFallback) {
+      return this.saveToLocal(file, key);
     }
 
     try {
-      const command = new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: 'application/pdf',
-      });
-
-      await this.s3.send(command);
-      this.logger.log(`Upload concluído com sucesso: ${key}`);
-      return `${this.publicUrl}/${key}`;
-    } catch (error) {
-      // Log detalhado do erro para diagnóstico
-      this.logger.error(`Falha no upload para key ${key}:`);
-      if (error instanceof Error) {
-        this.logger.error(`  Mensagem: ${error.message}`);
-        this.logger.error(`  Nome do erro: ${error.name}`);
-        if (error.stack) this.logger.error(`  Stack trace: ${error.stack}`);
-      } else {
-        this.logger.error(`  Erro desconhecido: ${JSON.stringify(error)}`);
-      }
-      throw new InternalServerErrorException(
-        `Erro ao salvar arquivo no storage: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: file,
+          ContentType: 'application/pdf',
+        }),
       );
+
+      const url = `${this.publicUrl}/${key}`;
+
+      this.logger.log(`✅ Upload realizado: ${url}`);
+
+      return url;
+    } catch (error) {
+      this.logger.error('❌ Erro no upload R2, ativando fallback', error);
+      this.useFallback = true;
+      return this.saveToLocal(file, key);
     }
   }
 
-  /**
-   * Recupera um arquivo do R2, aceitando tanto a chave quanto a URL pública completa.
-   * @param keyOrUrl Chave (ex: "tenant/123.pdf") ou URL pública completa
-   * @returns Buffer do arquivo
-   */
-  async get(keyOrUrl: string): Promise<Buffer> {
-    let key = keyOrUrl;
-    if (keyOrUrl.startsWith(this.publicUrl)) {
-      key = keyOrUrl.replace(this.publicUrl + '/', '');
+  // =========================
+  // 🔥 MÉTODO ESPECÍFICO PDF
+  // =========================
+  async uploadPdf(buffer: Buffer, fileName: string): Promise<string> {
+    const key = `pdfs/${fileName}`;
+    return this.upload(buffer, key);
+  }
+
+  // =========================
+  // 🔥 FALLBACK LOCAL (IMPORTANTE)
+  // =========================
+  private async saveToLocal(buffer: Buffer, key: string): Promise<string> {
+    const localPath = path.join(process.cwd(), 'storage', key);
+
+    await fs.mkdir(path.dirname(localPath), { recursive: true });
+    await fs.writeFile(localPath, buffer);
+
+    const apiUrl =
+      process.env.API_URL || 'http://localhost:3000/api';
+
+    const url = `${apiUrl}/storage/${key}`;
+
+    this.logger.warn(`⚠️ Fallback local ativo: ${url}`);
+
+    return url;
+  }
+
+  // =========================
+  // 🔥 GET FILE
+  // =========================
+  async getFile(key: string): Promise<Buffer> {
+    if (this.useFallback) {
+      return this.getLocalFile(key);
     }
 
     try {
@@ -93,39 +132,30 @@ export class StorageService {
       );
 
       const stream = response.Body as any;
-      if (!stream) {
-        throw new Error('Resposta do R2 sem corpo');
-      }
 
       return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
+
         stream.on('data', (chunk: Buffer) => chunks.push(chunk));
         stream.on('end', () => resolve(Buffer.concat(chunks)));
-        stream.on('error', (err: Error) => reject(err));
+        stream.on('error', reject);
       });
     } catch (error) {
-      this.logger.error(`Erro ao obter arquivo ${key}: ${error instanceof Error ? error.message : String(error)}`);
-      throw new InternalServerErrorException(`Arquivo não encontrado no storage: ${key}`);
+      this.logger.error('❌ Erro ao buscar arquivo no R2', error);
+      return this.getLocalFile(key);
     }
   }
 
-  /**
-   * Gera uma URL assinada (válida por 1 hora) para acesso temporário.
-   * Útil se o bucket não for público.
-   * @param key Chave do objeto
-   * @returns URL assinada
-   */
-  async getSignedUrl(key: string): Promise<string> {
+  // =========================
+  // 🔥 FALLBACK GET LOCAL
+  // =========================
+  private async getLocalFile(key: string): Promise<Buffer> {
     try {
-      const command = new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      });
-      const signedUrl = await getSignedUrl(this.s3, command, { expiresIn: 3600 });
-      return signedUrl;
+      const localPath = path.join(process.cwd(), 'storage', key);
+      return await fs.readFile(localPath);
     } catch (error) {
-      this.logger.error(`Erro ao gerar URL assinada para ${key}: ${error instanceof Error ? error.message : String(error)}`);
-      throw new InternalServerErrorException('Erro ao gerar link temporário');
+      this.logger.error('❌ Erro ao buscar arquivo local', error);
+      throw new InternalServerErrorException('Arquivo não encontrado');
     }
   }
 }

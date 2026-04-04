@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
@@ -10,6 +11,23 @@ import { randomBytes } from 'crypto';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { InvoiceStatus } from '@prisma/client';
+
+type PdfResult =
+  | { pdfUrl: string }
+  | { generating: true };
+
+interface InvoiceItemInput {
+  description: string;
+  price: number;
+  quantity: number;
+  issPercent?: number;
+}
+
+interface CreateInvoiceDto {
+  clientId: number;
+  items: InvoiceItemInput[];
+}
 
 @Injectable()
 export class InvoicesService {
@@ -23,31 +41,44 @@ export class InvoicesService {
     private pdfQueue: Queue,
   ) {}
 
-  private calculate(items: any[]) {
+  // =========================
+  // CALCULO
+  // =========================
+  private calculate(items: InvoiceItemInput[]) {
     let total = 0;
 
     const normalized = items.map((item) => {
-      const price = Number(item.price);
-      const quantity = Number(item.quantity);
+      if (!item.description) {
+        throw new BadRequestException('Item sem descrição');
+      }
 
-      const iss = item.issPercent ? price * (item.issPercent / 100) : 0;
-      const t = (price + iss) * quantity;
+      const price = Number(item.price) || 0;
+      const quantity = Number(item.quantity) || 1;
 
-      total += t;
+      const iss = item.issPercent
+        ? price * (item.issPercent / 100)
+        : 0;
+
+      const itemTotal = (price + iss) * quantity;
+
+      total += itemTotal;
 
       return {
         description: item.description,
         quantity,
         price,
         issPercent: item.issPercent,
-        total: t,
+        total: itemTotal,
       };
     });
 
     return { items: normalized, total };
   }
 
-  async create(tenantId: string, data: any) {
+  // =========================
+  // CREATE
+  // =========================
+  async create(tenantId: string, data: CreateInvoiceDto) {
     if (!data.items?.length) {
       throw new BadRequestException('Fatura sem itens');
     }
@@ -66,6 +97,7 @@ export class InvoicesService {
       include: { items: true, client: true, tenant: true },
     });
 
+    // 🔥 FILA PDF
     await this.pdfQueue.add('generate-pdf', {
       tenantId,
       entityId: invoice.id,
@@ -73,15 +105,102 @@ export class InvoicesService {
       data: invoice,
     });
 
+    this.logger.log(`📄 Fatura criada e enviada para fila: ${invoice.id}`);
+
     return invoice;
   }
 
+  // =========================
+  // LISTAR
+  // =========================
+  async findAll(tenantId: string, role?: string) {
+    const where: any = {};
+
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role || '')) {
+      where.tenantId = tenantId;
+    }
+
+    return this.prisma.invoice.findMany({
+      where,
+      include: {
+        client: true,
+        items: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // =========================
+  // BUSCAR
+  // =========================
+  async findOne(id: number, tenantId: string, role?: string) {
+    const where: any = { id };
+
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role || '')) {
+      where.tenantId = tenantId;
+    }
+
+    const invoice = await this.prisma.invoice.findFirst({
+      where,
+      include: {
+        client: true,
+        items: true,
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Fatura não encontrada');
+    }
+
+    return invoice;
+  }
+
+  // =========================
+  // UPDATE
+  // =========================
+  async update(
+    id: number,
+    tenantId: string,
+    data: Partial<CreateInvoiceDto> & { status?: string },
+    role?: string,
+  ) {
+    await this.findOne(id, tenantId, role);
+
+    return this.prisma.invoice.update({
+      where: { id },
+      data: {
+        clientId: data.clientId,
+        status: data.status as InvoiceStatus,
+      },
+      include: {
+        client: true,
+        items: true,
+      },
+    });
+  }
+
+  // =========================
+  // DELETE
+  // =========================
+  async remove(id: number, tenantId: string, role?: string) {
+    await this.findOne(id, tenantId, role);
+
+    return this.prisma.invoice.delete({
+      where: { id },
+    });
+  }
+
+  // =========================
+  // TOKEN
+  // =========================
   async generateShareToken(id: number) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
     });
 
-    if (!invoice) throw new NotFoundException();
+    if (!invoice) {
+      throw new NotFoundException('Fatura não encontrada');
+    }
 
     if (
       invoice.shareToken &&
@@ -104,22 +223,33 @@ export class InvoicesService {
     return token;
   }
 
-  async sendViaWhatsApp(id: number) {
-    const invoice = await this.prisma.invoice.findUnique({
-      where: { id },
-      include: { client: true, items: true, tenant: true },
+  // =========================
+  // PDF PUBLICO
+  // =========================
+  async getPdfByShareToken(token: string): Promise<PdfResult> {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { shareToken: token },
+      include: {
+        client: true,
+        items: true,
+        tenant: true,
+      },
     });
 
-    if (!invoice) throw new NotFoundException();
-    if (!invoice.client.phone) throw new BadRequestException('Sem telefone');
+    if (!invoice) {
+      throw new UnauthorizedException('Token inválido');
+    }
 
-    const token = await this.generateShareToken(id);
+    if (
+      invoice.shareTokenExpires &&
+      new Date() > invoice.shareTokenExpires
+    ) {
+      throw new UnauthorizedException('Token expirado');
+    }
 
-    const base =
-      process.env.API_URL?.replace('/api', '') ||
-      'https://api.mecpro.tec.br';
-
-    const url = `${base}/api/public/invoices/share/${token}`;
+    if (invoice.pdfUrl) {
+      return { pdfUrl: invoice.pdfUrl };
+    }
 
     await this.pdfQueue.add('generate-pdf', {
       tenantId: invoice.tenantId,
@@ -128,11 +258,48 @@ export class InvoicesService {
       data: invoice,
     });
 
+    this.logger.warn(`📄 PDF ainda não pronto. Gerando: ${invoice.id}`);
+
+    return { generating: true };
+  }
+
+  // =========================
+  // WHATSAPP
+  // =========================
+  async sendViaWhatsApp(id: number) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: {
+        client: true,
+        items: true,
+        tenant: true,
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Fatura não encontrada');
+    }
+
+    if (!invoice.client.phone) {
+      throw new BadRequestException('Cliente sem telefone');
+    }
+
+    const token = await this.generateShareToken(id);
+
+    const frontendBase =
+      process.env.FRONTEND_URL || 'https://mecpro.tec.br';
+
+    const link = `${frontendBase}/share/${token}`;
+
     const message = `Olá ${invoice.client.name}!
 
 Sua fatura está pronta ✅
 
-${url}
+📄 Visualizar:
+${link}
+
+📥 PDF:
+${invoice.pdfUrl || 'Gerando...'}
 
 💰 Total: R$ ${invoice.total.toFixed(2)}`;
 
@@ -141,7 +308,8 @@ ${url}
         invoice.client.phone,
         message,
       ),
-      pdfUrl: url,
+      pdfUrl: invoice.pdfUrl,
+      publicLink: link,
       queued: true,
     };
   }

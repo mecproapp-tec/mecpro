@@ -1,4 +1,13 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "compilerOptions": {
+    "outDir": "./dist"
+  },
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"],
+  "assets": [
+    {
+      "include": "modules/pdf/templates/**/*",
+      "outDir": "dist"
+    }
+  ]
 }

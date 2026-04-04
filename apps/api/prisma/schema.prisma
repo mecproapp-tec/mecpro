@@ -67,11 +67,12 @@ model Tenant {
   users                  User[]
   pendingSubscriptions   PendingSubscription[]
 
+  publicShares           PublicShare[] 
+
   @@index([status])
   @@index([email])
   @@index([documentNumber])
 }
-
 /// ///////////////// USUÁRIOS (proprietários e admins da oficina) ////////////////////
 model User {
   name          String
@@ -198,7 +199,7 @@ model Appointment {
   comment       String?
   date          DateTime
   id            Int            @id @default(autoincrement())
-  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade) // ✅ CASCADE ADICIONADO
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   notifications Notification[]
 
@@ -222,7 +223,7 @@ model Estimate {
   pdfGeneratedAt    DateTime?      @map("pdf_generated_at")
   pdfStatus         String?        @default("pending") @map("pdf_status")
   pdfUrl            String?        @map("pdf_url")
-  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade) // ✅ CASCADE ADICIONADO
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             EstimateItem[]
   invoice           Invoice?
@@ -258,7 +259,7 @@ model Budget {
   total     Float
   status    String
   createdAt DateTime @default(now())
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade) // ✅ já tinha Cascade
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([clientId])
@@ -279,7 +280,7 @@ model Invoice {
   pdfGeneratedAt    DateTime?     @map("pdf_generated_at")
   pdfStatus         String?       @default("pending") @map("pdf_status")
   pdfUrl            String?       @map("pdf_url")
-  client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade) // ✅ CASCADE ADICIONADO
+  client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   estimate          Estimate?     @relation(fields: [estimateId], references: [id])
   tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             InvoiceItem[]
@@ -341,6 +342,24 @@ model ScheduledNotification {
   @@index([schedule, sent])
 }
 
+model PublicShare {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  type       ShareType
+  resourceId Int
+  tenantId   String
+
+  pdfUrl     String
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([tenantId])
+  @@index([type, resourceId])
+}
+
 /// ///////////////// ENUMS ////////////////////
 enum TenantStatus {
   ACTIVE
@@ -378,4 +397,9 @@ enum InvoiceStatus {
   PENDING
   PAID
   CANCELED
+}
+
+enum ShareType {
+  ESTIMATE
+  INVOICE
 }

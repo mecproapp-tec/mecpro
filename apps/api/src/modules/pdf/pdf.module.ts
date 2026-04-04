@@ -6,13 +6,24 @@ import { StorageModule } from '../storage/storage.module';
 import { PrismaModule } from '../../shared/prisma/prisma.module';
 import { PdfController } from './pdf.controller';
 
+// 🔥 IMPORTA OS SERVICES
+import { EstimatesPdfService } from '../estimates/estimates-pdf.service';
+import { InvoicesPdfService } from '../invoices/invoices-pdf.service';
+
 @Module({
   imports: [
     BullModule.registerQueue({ name: 'pdf' }),
     StorageModule,
     PrismaModule,
   ],
-  providers: [PdfService, PdfProcessor],
+  providers: [
+    PdfService,
+    PdfProcessor,
+
+    // 🔥 ADICIONA AQUI (RESOLVE ERRO)
+    EstimatesPdfService,
+    InvoicesPdfService,
+  ],
   controllers: [PdfController],
   exports: [PdfService],
 })

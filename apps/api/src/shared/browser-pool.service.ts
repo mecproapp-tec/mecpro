@@ -1,48 +1,38 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import * as puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import puppeteer, { Browser } from 'puppeteer';
 
 @Injectable()
 export class BrowserPoolService implements OnModuleDestroy {
+  private browser: Browser | null = null;
   private readonly logger = new Logger(BrowserPoolService.name);
-  private browser: puppeteer.Browser | null = null;
-  private isLaunching = false;
 
-  async getBrowser(): Promise<puppeteer.Browser> {
-    if (this.browser) return this.browser;
-
-    if (this.isLaunching) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      return this.getBrowser();
-    }
-
-    this.isLaunching = true;
-
-    try {
-      const executablePath = await chromium.executablePath;
+  async getBrowser(): Promise<Browser> {
+    if (!this.browser) {
+      this.logger.log('🚀 Iniciando Puppeteer...');
 
       this.browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath,
-        headless: chromium.headless,
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+        ],
       });
 
-      this.logger.log('Browser launched (Vercel)');
-      return this.browser;
-    } catch (error) {
-      this.logger.error('Erro ao iniciar Puppeteer', error);
-      throw error;
-    } finally {
-      this.isLaunching = false;
+      this.logger.log('✅ Puppeteer iniciado');
     }
+
+    return this.browser;
   }
 
   async onModuleDestroy() {
     if (this.browser) {
       await this.browser.close();
-      this.browser = null;
-      this.logger.log('Browser closed');
+      this.logger.log('🛑 Puppeteer finalizado');
     }
   }
 }

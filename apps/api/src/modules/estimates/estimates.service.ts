@@ -11,6 +11,10 @@ import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
+type PdfResult =
+  | { pdfUrl: string }
+  | { generating: true };
+
 @Injectable()
 export class EstimatesService {
   private readonly logger = new Logger(EstimatesService.name);
@@ -23,6 +27,9 @@ export class EstimatesService {
     private pdfQueue: Queue,
   ) {}
 
+  // =========================
+  // CALCULO
+  // =========================
   private calculateItems(items: any[]) {
     let total = 0;
 
@@ -46,6 +53,9 @@ export class EstimatesService {
     return { items: normalized, total };
   }
 
+  // =========================
+  // CREATE
+  // =========================
   async create(tenantId: string, data: any) {
     if (!data.items?.length) {
       throw new BadRequestException('Orçamento sem itens');
@@ -71,6 +81,7 @@ export class EstimatesService {
       include: { items: true, client: true, tenant: true },
     });
 
+    // 🔥 Envia para fila gerar PDF
     await this.pdfQueue.add('generate-pdf', {
       tenantId,
       entityId: estimate.id,
@@ -78,9 +89,34 @@ export class EstimatesService {
       data: estimate,
     });
 
+    this.logger.log(`📄 Orçamento criado e enviado para fila: ${estimate.id}`);
+
     return estimate;
   }
 
+  // =========================
+  // LISTAR
+  // =========================
+  async findAll(tenantId: string, role?: string) {
+    const where: any = {};
+
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role || '')) {
+      where.tenantId = tenantId;
+    }
+
+    return this.prisma.estimate.findMany({
+      where,
+      include: {
+        client: true,
+        items: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // =========================
+  // BUSCAR UM
+  // =========================
   async findOne(id: number, tenantId: string, role?: string) {
     const where: any = { id };
 
@@ -101,6 +137,47 @@ export class EstimatesService {
     return estimate;
   }
 
+  // =========================
+  // UPDATE
+  // =========================
+  async update(id: number, tenantId: string, data: any, role?: string) {
+    await this.findOne(id, tenantId, role);
+
+    const { items, total } = this.calculateItems(data.items);
+
+    return this.prisma.estimate.update({
+      where: { id },
+      data: {
+        clientId: data.clientId,
+        date: new Date(data.date),
+        total,
+        status: data.status || 'DRAFT',
+        items: {
+          deleteMany: {},
+          create: items,
+        },
+      },
+      include: {
+        client: true,
+        items: true,
+      },
+    });
+  }
+
+  // =========================
+  // DELETE
+  // =========================
+  async remove(id: number, tenantId: string, role?: string) {
+    await this.findOne(id, tenantId, role);
+
+    return this.prisma.estimate.delete({
+      where: { id },
+    });
+  }
+
+  // =========================
+  // TOKEN PUBLICO
+  // =========================
   async generateShareToken(id: number, tenantId: string, role?: string) {
     const estimate = await this.findOne(id, tenantId, role);
 
@@ -125,7 +202,10 @@ export class EstimatesService {
     return token;
   }
 
-  async getPdfByShareToken(token: string) {
+  // =========================
+  // PDF PUBLICO
+  // =========================
+  async getPdfByShareToken(token: string): Promise<PdfResult> {
     const estimate = await this.prisma.estimate.findFirst({
       where: { shareToken: token },
       include: { client: true, items: true, tenant: true },
@@ -137,12 +217,12 @@ export class EstimatesService {
       throw new UnauthorizedException('Token expirado');
     }
 
+    // ✅ Se já tem PDF → retorna
     if (estimate.pdfUrl) {
-      return {
-        pdfUrl: estimate.pdfUrl,
-      };
+      return { pdfUrl: estimate.pdfUrl };
     }
 
+    // 🔥 Se não tem → gera
     await this.pdfQueue.add('generate-pdf', {
       tenantId: estimate.tenantId,
       entityId: estimate.id,
@@ -150,9 +230,14 @@ export class EstimatesService {
       data: estimate,
     });
 
-    throw new BadRequestException('PDF ainda está sendo gerado');
+    this.logger.warn(`📄 PDF ainda não pronto. Gerando: ${estimate.id}`);
+
+    return { generating: true };
   }
 
+  // =========================
+  // WHATSAPP
+  // =========================
   async sendViaWhatsApp(id: number, tenantId: string, role?: string) {
     const estimate = await this.findOne(id, tenantId, role);
 
@@ -162,24 +247,20 @@ export class EstimatesService {
 
     const token = await this.generateShareToken(id, tenantId, role);
 
-    const base =
-      process.env.API_URL?.replace('/api', '') ||
-      'https://api.mecpro.tec.br';
+    const frontendBase =
+      process.env.FRONTEND_URL || 'https://mecpro.tec.br';
 
-    const link = `${base}/api/public/estimates/share/${token}`;
-
-    await this.pdfQueue.add('generate-pdf', {
-      tenantId: estimate.tenantId,
-      entityId: estimate.id,
-      entityType: 'estimate',
-      data: estimate,
-    });
+    const link = `${frontendBase}/share/${token}`;
 
     const message = `Olá ${estimate.client.name}!
 
 Seu orçamento está pronto ✅
 
+📄 Visualizar:
 ${link}
+
+📥 PDF:
+${estimate.pdfUrl || 'Gerando...'}
 
 💰 Total: R$ ${estimate.total.toFixed(2)}`;
 
@@ -188,7 +269,8 @@ ${link}
         estimate.client.phone,
         message,
       ),
-      pdfUrl: link,
+      pdfUrl: estimate.pdfUrl,
+      publicLink: link,
       queued: true,
     };
   }
