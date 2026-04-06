@@ -14,7 +14,7 @@
     "lint": "eslint \"{src}/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest",
-    "postinstall": "prisma generate && npx puppeteer install"
+   "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1024.0",
@@ -42,7 +42,6 @@
     "passport-jwt": "^4.0.1",
     "pdfkit": "^0.18.0",
     "puppeteer": "^24.40.0",
-    "puppeteer-core": "^24.40.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "uuid": "^13.0.0"

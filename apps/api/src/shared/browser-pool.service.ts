@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import puppeteer, { Browser } from 'puppeteer';
+import chromium from '@sparticuz/chromium';
 
 @Injectable()
 export class BrowserPoolService implements OnModuleDestroy {
@@ -10,17 +11,16 @@ export class BrowserPoolService implements OnModuleDestroy {
     if (!this.browser) {
       this.logger.log('🚀 Iniciando Puppeteer...');
 
+      const isProd = process.env.NODE_ENV === 'production';
+
       this.browser = await puppeteer.launch({
+        args: isProd
+          ? chromium.args
+          : ['--no-sandbox', '--disable-setuid-sandbox'],
+        executablePath: isProd
+          ? await chromium.executablePath()
+          : undefined,
         headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-        ],
       });
 
       this.logger.log('✅ Puppeteer iniciado');
