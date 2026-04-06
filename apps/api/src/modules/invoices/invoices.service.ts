@@ -11,7 +11,7 @@ import { randomBytes } from 'crypto';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { InvoiceStatus } from '@prisma/client';
+import { InvoiceStatus, ShareType } from '@prisma/client';
 
 type PdfResult =
   | { pdfUrl: string }
@@ -36,14 +36,9 @@ export class InvoicesService {
   constructor(
     private prisma: PrismaService,
     private whatsappService: WhatsappService,
-
-    @InjectQueue('pdf')
-    private pdfQueue: Queue,
+    @InjectQueue('pdf') private pdfQueue: Queue,
   ) {}
 
-  // =========================
-  // CALCULO
-  // =========================
   private calculate(items: InvoiceItemInput[]) {
     let total = 0;
 
@@ -75,9 +70,6 @@ export class InvoicesService {
     return { items: normalized, total };
   }
 
-  // =========================
-  // CREATE
-  // =========================
   async create(tenantId: string, data: CreateInvoiceDto) {
     if (!data.items?.length) {
       throw new BadRequestException('Fatura sem itens');
@@ -104,14 +96,9 @@ export class InvoicesService {
       data: invoice,
     });
 
-    this.logger.log(`📄 Fatura criada e enviada para fila: ${invoice.id}`);
-
     return invoice;
   }
 
-  // =========================
-  // LISTAR
-  // =========================
   async findAll(tenantId: string, role?: string) {
     const where: any = {};
 
@@ -121,17 +108,11 @@ export class InvoicesService {
 
     return this.prisma.invoice.findMany({
       where,
-      include: {
-        client: true,
-        items: true,
-      },
+      include: { client: true, items: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  // =========================
-  // BUSCAR
-  // =========================
   async findOne(id: number, tenantId: string, role?: string) {
     const where: any = { id };
 
@@ -141,10 +122,7 @@ export class InvoicesService {
 
     const invoice = await this.prisma.invoice.findFirst({
       where,
-      include: {
-        client: true,
-        items: true,
-      },
+      include: { client: true, items: true },
     });
 
     if (!invoice) {
@@ -154,9 +132,6 @@ export class InvoicesService {
     return invoice;
   }
 
-  // =========================
-  // UPDATE
-  // =========================
   async update(
     id: number,
     tenantId: string,
@@ -171,16 +146,10 @@ export class InvoicesService {
         clientId: data.clientId,
         status: data.status as InvoiceStatus,
       },
-      include: {
-        client: true,
-        items: true,
-      },
+      include: { client: true, items: true },
     });
   }
 
-  // =========================
-  // DELETE
-  // =========================
   async remove(id: number, tenantId: string, role?: string) {
     await this.findOne(id, tenantId, role);
 
@@ -189,9 +158,6 @@ export class InvoicesService {
     });
   }
 
-  // =========================
-  // TOKEN (CORRIGIDO)
-  // =========================
   async generateShareToken(id: number) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
@@ -206,8 +172,10 @@ export class InvoicesService {
     await this.prisma.publicShare.create({
       data: {
         token,
-        type: 'invoice',
-        entityId: String(id),
+        type: ShareType.INVOICE,
+        resourceId: id,
+        tenantId: invoice.tenantId,
+        pdfUrl: invoice.pdfUrl || '',
         expiresAt: new Date(Date.now() + 7 * 86400000),
       },
     });
@@ -215,9 +183,6 @@ export class InvoicesService {
     return token;
   }
 
-  // =========================
-  // PDF PUBLICO (CORRIGIDO)
-  // =========================
   async getPdfByShareToken(token: string): Promise<PdfResult> {
     const share = await this.prisma.publicShare.findUnique({
       where: { token },
@@ -227,7 +192,7 @@ export class InvoicesService {
       throw new UnauthorizedException('Token inválido');
     }
 
-    if (share.type !== 'invoice') {
+    if (share.type !== ShareType.INVOICE) {
       throw new UnauthorizedException('Tipo inválido');
     }
 
@@ -236,7 +201,7 @@ export class InvoicesService {
     }
 
     const invoice = await this.prisma.invoice.findUnique({
-      where: { id: Number(share.entityId) },
+      where: { id: share.resourceId },
       include: {
         client: true,
         items: true,
@@ -249,6 +214,11 @@ export class InvoicesService {
     }
 
     if (invoice.pdfUrl) {
+      await this.prisma.publicShare.update({
+        where: { token },
+        data: { pdfUrl: invoice.pdfUrl },
+      });
+
       return { pdfUrl: invoice.pdfUrl };
     }
 
@@ -259,14 +229,9 @@ export class InvoicesService {
       data: invoice,
     });
 
-    this.logger.warn(`📄 PDF ainda não pronto. Gerando: ${invoice.id}`);
-
     return { generating: true };
   }
 
-  // =========================
-  // WHATSAPP
-  // =========================
   async sendViaWhatsApp(id: number) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
@@ -287,10 +252,10 @@ export class InvoicesService {
 
     const token = await this.generateShareToken(id);
 
-    const apiBase =
-      process.env.API_URL || 'https://api.mecpro.tec.br/api';
+    const frontendBase =
+      process.env.FRONTEND_URL || 'https://mecpro.tec.br';
 
-    const link = `${apiBase}/public/invoices/share/${token}`;
+    const link = `${frontendBase}/share/${token}`;
 
     const message = `Olá ${invoice.client.name}!
 
@@ -298,9 +263,6 @@ Sua fatura está pronta ✅
 
 📄 Visualizar:
 ${link}
-
-📥 PDF:
-${invoice.pdfUrl || 'Gerando...'}
 
 💰 Total: R$ ${invoice.total.toFixed(2)}`;
 

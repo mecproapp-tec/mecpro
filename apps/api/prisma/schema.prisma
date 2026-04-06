@@ -349,7 +349,8 @@ model PublicShare {
   resourceId Int
   tenantId   String
 
-  pdfUrl     String
+  pdfUrl     String?   // ✅ AGORA OPCIONAL
+
   expiresAt  DateTime?
   createdAt  DateTime @default(now())
 
