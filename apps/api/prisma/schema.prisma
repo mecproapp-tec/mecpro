@@ -66,13 +66,13 @@ model Tenant {
   subscriptions          Subscription[]
   users                  User[]
   pendingSubscriptions   PendingSubscription[]
-
   publicShares           PublicShare[] 
 
   @@index([status])
   @@index([email])
   @@index([documentNumber])
 }
+
 /// ///////////////// USUÁRIOS (proprietários e admins da oficina) ////////////////////
 model User {
   name          String
@@ -223,6 +223,7 @@ model Estimate {
   pdfGeneratedAt    DateTime?      @map("pdf_generated_at")
   pdfStatus         String?        @default("pending") @map("pdf_status")
   pdfUrl            String?        @map("pdf_url")
+  pdfKey            String?        @map("pdf_key")   // 🔥 ADICIONADO
   client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             EstimateItem[]
@@ -234,6 +235,7 @@ model Estimate {
   @@index([pdfUrl])
   @@index([pdfStatus])
   @@index([tenantId, pdfStatus])
+  @@index([pdfKey])   // 🔥 ADICIONADO
 }
 
 model EstimateItem {
@@ -280,6 +282,7 @@ model Invoice {
   pdfGeneratedAt    DateTime?     @map("pdf_generated_at")
   pdfStatus         String?       @default("pending") @map("pdf_status")
   pdfUrl            String?       @map("pdf_url")
+  pdfKey            String?       @map("pdf_key")   // 🔥 ADICIONADO
   client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   estimate          Estimate?     @relation(fields: [estimateId], references: [id])
   tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -292,6 +295,7 @@ model Invoice {
   @@index([pdfUrl])
   @@index([pdfStatus])
   @@index([tenantId, pdfStatus])
+  @@index([pdfKey])   // 🔥 ADICIONADO
 }
 
 model InvoiceItem {
@@ -348,12 +352,9 @@ model PublicShare {
   type       ShareType
   resourceId Int
   tenantId   String
-
-  pdfUrl     String?   // ✅ AGORA OPCIONAL
-
+  pdfUrl     String?   // Opcional – pode ser removido se usar só o redirect via pdfKey
   expiresAt  DateTime?
   createdAt  DateTime @default(now())
-
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([token])

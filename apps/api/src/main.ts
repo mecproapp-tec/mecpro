@@ -1,5 +1,6 @@
 // apps/api/src/main.ts
 process.env.TZ = 'America/Sao_Paulo';
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
