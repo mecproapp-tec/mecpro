@@ -6,6 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { json, urlencoded } from 'express'; // 👈 importe os middlewares
 
 async function bootstrap() {
   process.on('unhandledRejection', (reason) => {
@@ -23,6 +24,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // ================= AUMENTAR LIMITE DE PAYLOAD =================
+  // Permite até 10MB para JSON e URL-encoded
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
+
   // Helmet com configurações adequadas para CORS
   app.use(
     helmet({
@@ -33,7 +39,6 @@ async function bootstrap() {
   );
 
   // ================= CONFIGURAÇÃO CORS CORRIGIDA =================
-  // Origens padrão (inclui domínios principais e previews da Vercel)
   const defaultOrigins = [
     'https://www.mecpro.tec.br',
     'https://mecpro.tec.br',
@@ -46,34 +51,21 @@ async function bootstrap() {
     'http://localhost:8080',
   ];
 
-  // Lê ALLOWED_ORIGINS do ambiente, se existir
   const envOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map(o => o.trim())
     .filter(Boolean);
 
-  // Combina as origens padrão com as do ambiente (sem duplicatas)
   const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
 
   console.log('✅ CORS - Origens permitidas:', allowedOrigins);
 
-  // Função para verificar se uma origem é permitida
   const isOriginAllowed = (origin: string): boolean => {
-    // Permite requisições sem origin (curl, ferramentas)
     if (!origin) return true;
-
-    // Verificação exata
     if (allowedOrigins.includes(origin)) return true;
-
-    // Permite localhost em qualquer porta
     if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true;
-
-    // Permite qualquer subdomínio de mecpro.tec.br
     if (origin.match(/^https?:\/\/.*\.mecpro\.tec\.br$/)) return true;
-
-    // Permite qualquer subdomínio de vercel.app (previews)
     if (origin.match(/^https?:\/\/.*\.vercel\.app$/)) return true;
-
     return false;
   };
 
@@ -96,7 +88,6 @@ async function bootstrap() {
     optionsSuccessStatus: 200,
   });
 
-  // Validação global
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -105,10 +96,8 @@ async function bootstrap() {
     }),
   );
 
-  // Prefixo global para todas as rotas
   app.setGlobalPrefix('api');
 
-  // Endpoint de saúde sem prefixo /api para monitoramento
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.get('/health', (req, res) => {
     res.status(200).json({

@@ -37,7 +37,7 @@ interface UpdateEstimateDto extends CreateEstimateDto {
 }
 
 // ============================
-// PRIVADO
+// PRIVADO (autenticado)
 // ============================
 @Controller('estimates')
 @UseGuards(JwtAuthGuard)
@@ -51,10 +51,7 @@ export class EstimatesController {
 
   @Get()
   findAll(@Req() req: AuthRequest) {
-    return this.estimatesService.findAll(
-      req.user.tenantId,
-      req.user.role,
-    );
+    return this.estimatesService.findAll(req.user.tenantId, req.user.role);
   }
 
   @Get(':id')
@@ -89,6 +86,9 @@ export class EstimatesController {
     );
   }
 
+  /**
+   * Gera um token de compartilhamento público para o orçamento
+   */
   @Post(':id/share')
   async generateShareLink(@Param('id') id: string, @Req() req: AuthRequest) {
     const token = await this.estimatesService.generateShareToken(
@@ -97,20 +97,28 @@ export class EstimatesController {
       req.user.role,
     );
 
-    const baseUrl = process.env.API_URL || 'https://api.mecpro.tec.br/api';
-
-return {
-  url: `${baseUrl}/public/invoices/share/${token}`,
-};
-
+    const baseUrl = (process.env.API_URL || 'https://api.mecpro.tec.br').replace(/\/$/, '');
     return {
-      url: `${baseUrl}/api/public/estimates/share/${token}`,
+      url: `${baseUrl}/public/estimates/share/${token}`,
     };
   }
+
+  /**
+   * (Opcional) Endpoint para testar o upload no R2
+   * Descomente se quiser validar a conexão com Cloudflare R2
+   */
+  // @Get('test-r2')
+  // async testR2(@Req() req: AuthRequest) {
+  //   const { StorageService } = await import('../storage/storage.service');
+  //   const storageService = new StorageService();
+  //   const testBuffer = Buffer.from(`Teste R2 - ${new Date().toISOString()}`);
+  //   const url = await storageService.uploadPdf(testBuffer, `test/${Date.now()}.pdf`);
+  //   return { url };
+  // }
 }
 
 // ============================
-// PUBLICO
+// PÚBLICO (sem autenticação)
 // ============================
 @Controller('public/estimates')
 export class PublicEstimatesController {
@@ -118,48 +126,37 @@ export class PublicEstimatesController {
 
   @Public()
   @Get('share/:token')
-  async getSharedPdf(
-    @Param('token') token: string,
-    @Res() res: Response,
-  ) {
+  async getSharedPdf(@Param('token') token: string, @Res() res: Response) {
     if (!token) {
-      return res.status(400).send('Token não fornecido');
+      return res.status(HttpStatus.BAD_REQUEST).send('Token não fornecido');
     }
 
     try {
       const result = await this.estimatesService.getPdfByShareToken(token);
 
-   if ('pdfUrl' in result) {
-  return res.redirect(result.pdfUrl);
-}
+      // Se já existe PDF (URL pública do R2)
+      if ('pdfUrl' in result && result.pdfUrl) {
+        return res.redirect(result.pdfUrl);
+      }
 
-if ('pdfBuffer' in result) {
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    'inline; filename=orcamento.pdf',
-  );
-  return res.send(result.pdfBuffer);
-}
-
-if ('generating' in result) {
-  return res
-    .status(202)
-    .send('Gerando PDF, tente novamente...');
-}
-
+      // Se o PDF está sendo gerado agora (fallback)
       return res
-        .status(202)
-        .send('Gerando PDF, tente novamente...');
+        .status(HttpStatus.ACCEPTED)
+        .send('Gerando PDF, tente novamente em alguns segundos...');
     } catch (error: any) {
+      // Erros específicos de token
       if (
         error?.message === 'Token inválido' ||
         error?.message === 'Token expirado'
       ) {
-        return res.status(404).send('Link inválido');
+        return res.status(HttpStatus.NOT_FOUND).send('Link inválido ou expirado');
       }
 
-      return res.status(500).send('Erro ao gerar PDF');
+      // Qualquer outro erro
+      console.error('Erro ao acessar PDF público:', error);
+      return res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .send('Erro ao carregar o PDF');
     }
   }
 }

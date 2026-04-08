@@ -7,8 +7,6 @@ const baseUrl =
     : "http://localhost:3000/api");
 const API_URL = baseUrl.replace(/\/$/, "");
 
-console.log("🔧 API_URL:", API_URL);
-
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -21,13 +19,12 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log(`📤 Requisição para ${config.url} com token`);
-  } else {
-    console.log(`📤 Requisição para ${config.url} (sem token)`);
   }
   return config;
 });
 
+// Interceptor de resposta: NÃO remove token NÃO redireciona
+// Apenas loga e rejeita a promise
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -36,16 +33,7 @@ api.interceptors.response.use(
     } else {
       console.error("❌ Erro de rede:", error.message);
     }
-
-    const isLoginRequest = error.config?.url?.includes("/auth/login");
-
-    if (error.response?.status === 401 && !isLoginRequest) {
-      console.warn("🔐 401 detectado. Limpando sessão e redirecionando...");
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.replace("/login");
-    }
-
+    // Não remove token nem redireciona. Deixe o componente decidir.
     return Promise.reject(error);
   }
 );
@@ -56,7 +44,9 @@ export const login = async (data: { email: string; password: string }) => {
 };
 
 export const logout = async () => {
-  await api.post("/auth/logout");
+  try {
+    await api.post("/auth/logout");
+  } catch (e) {}
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   window.location.href = "/login";

@@ -38,10 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });
     const data = response.data;
-
-    // A API retorna { accessToken, refreshToken, user }
     const { accessToken, user } = data;
-
     if (!accessToken) {
       console.error('Resposta da API sem accessToken:', data);
       throw new Error('Token não recebido da API');
@@ -49,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       throw new Error('Dados do usuário não recebidos');
     }
-
     localStorage.setItem('token', accessToken);
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);

@@ -1,4 +1,3 @@
-// apps/api/src/modules/storage/storage.service.ts
 import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 
@@ -13,13 +12,8 @@ export class StorageService {
     this.bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME!;
     this.publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL!;
 
-    if (
-      !this.bucket ||
-      !this.publicUrl ||
-      !process.env.CLOUDFLARE_R2_ENDPOINT ||
-      !process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ||
-      !process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY
-    ) {
+    if (!this.bucket || !this.publicUrl || !process.env.CLOUDFLARE_R2_ENDPOINT ||
+        !process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || !process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY) {
       throw new Error('❌ R2 não configurado corretamente no .env');
     }
 
@@ -32,44 +26,30 @@ export class StorageService {
       },
       forcePathStyle: true,
     });
-
-    this.logger.log(`✅ R2 conectado: ${this.bucket}`);
+    this.logger.log(`✅ R2 conectado: bucket ${this.bucket}`);
   }
 
   async uploadPdf(buffer: Buffer, key: string): Promise<string> {
-    if (!buffer || buffer.length === 0) {
-      throw new InternalServerErrorException('Buffer inválido');
-    }
-    if (!key) {
-      throw new InternalServerErrorException('Key inválida');
-    }
-
+    if (!buffer || buffer.length === 0) throw new InternalServerErrorException('Buffer inválido');
     try {
-      await this.s3.send(
-        new PutObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-          Body: buffer,
-          ContentType: 'application/pdf',
-        }),
-      );
-
+      await this.s3.send(new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: 'application/pdf',
+      }));
       const url = `${this.publicUrl}/${key}`;
-      this.logger.log(`✅ Upload realizado: ${url}`);
+      this.logger.log(`✅ Upload R2: ${url} (${buffer.length} bytes)`);
       return url;
     } catch (error) {
-      this.logger.error('❌ Erro real no upload R2', error);
-      throw new InternalServerErrorException('Erro ao enviar PDF para o R2');
+      this.logger.error(`❌ Erro no upload R2: ${error.message}`, error.stack);
+      throw new InternalServerErrorException(`Falha no upload: ${error.message}`);
     }
   }
 
   async getFile(key: string): Promise<Buffer> {
-    if (!key) throw new InternalServerErrorException('Key inválida');
-
     try {
-      const response = await this.s3.send(
-        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-      );
+      const response = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
       const stream = response.Body as any;
       return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
@@ -79,7 +59,7 @@ export class StorageService {
       });
     } catch (error) {
       this.logger.error(`❌ Erro ao buscar arquivo: ${key}`, error);
-      throw new InternalServerErrorException('Erro ao buscar arquivo');
+      throw new InternalServerErrorException('Arquivo não encontrado');
     }
   }
 }
