@@ -62,11 +62,11 @@ model Tenant {
   invoices               Invoice[]
   notifications          Notification[]
   payments               Payment[]
+  pendingSubscriptions   PendingSubscription[]
+  publicShares           PublicShare[]
   scheduledNotifications ScheduledNotification[]
   subscriptions          Subscription[]
   users                  User[]
-  pendingSubscriptions   PendingSubscription[]
-  publicShares           PublicShare[] 
 
   @@index([status])
   @@index([email])
@@ -353,15 +353,15 @@ model ScheduledNotification {
 }
 
 model PublicShare {
-  id         String   @id @default(cuid())
-  token      String   @unique
+  id         String    @id @default(cuid())
+  token      String    @unique
   type       ShareType
   resourceId Int
   tenantId   String
   pdfUrl     String?
   expiresAt  DateTime?
-  createdAt  DateTime @default(now())
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([tenantId])
