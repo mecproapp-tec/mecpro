@@ -1,4 +1,5 @@
 import api from "./api";
+import { normalizeArray } from "../utils/normalizeArray";
 
 export interface EstimateItem {
   id?: number;
@@ -47,10 +48,7 @@ function extractObject(data: any) {
 
 export const getEstimates = async (page = 1, limit = 50) => {
   const response = await api.get(`/estimates?page=${page}&limit=${limit}`);
-  let dataArray: Estimate[] = [];
-  if (Array.isArray(response.data)) dataArray = response.data;
-  else if (response.data?.data && Array.isArray(response.data.data)) dataArray = response.data.data;
-  else if (response.data?.estimates && Array.isArray(response.data.estimates)) dataArray = response.data.estimates;
+  const dataArray = normalizeArray<Estimate>(response.data);
   return {
     data: dataArray,
     total: response.data?.total ?? dataArray.length,

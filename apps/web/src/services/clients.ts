@@ -1,4 +1,5 @@
 import api from "./api";
+import { normalizeArray } from "../utils/normalizeArray";
 
 export interface Client {
   id: number;
@@ -13,10 +14,7 @@ export interface Client {
 
 export async function getClients(): Promise<Client[]> {
   const response = await api.get("/clients");
-  if (Array.isArray(response.data)) return response.data;
-  if (response.data?.data && Array.isArray(response.data.data)) return response.data.data;
-  if (response.data?.clients && Array.isArray(response.data.clients)) return response.data.clients;
-  return [];
+  return normalizeArray<Client>(response.data);
 }
 
 export async function getClientById(id: number): Promise<Client> {

@@ -1,4 +1,5 @@
 import api from "./api";
+import { normalizeArray } from "../utils/normalizeArray";
 
 export interface InvoiceItem {
   id?: number;
@@ -46,10 +47,7 @@ function extractObject(data: any): any {
 
 export const getInvoices = async (): Promise<Invoice[]> => {
   const response = await api.get("/invoices");
-  if (Array.isArray(response.data)) return response.data;
-  if (response.data?.data && Array.isArray(response.data.data)) return response.data.data;
-  if (response.data?.invoices && Array.isArray(response.data.invoices)) return response.data.invoices;
-  return [];
+  return normalizeArray<Invoice>(response.data);
 };
 
 export const getInvoiceById = async (id: number): Promise<Invoice> => {

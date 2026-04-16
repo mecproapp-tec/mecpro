@@ -1,4 +1,5 @@
 import api from "./api";
+import { normalizeArray } from "../utils/normalizeArray";
 
 export interface Appointment {
   id: number;
@@ -28,16 +29,9 @@ function normalizeDate(date: string): string {
   return date;
 }
 
-function extractArray(data: any): Appointment[] {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.appointments)) return data.appointments;
-  return [];
-}
-
 export const getAppointments = async (): Promise<Appointment[]> => {
   const response = await api.get("/appointments");
-  const lista = extractArray(response.data);
+  const lista = normalizeArray<Appointment>(response.data);
   return lista.map((app) => ({
     ...app,
     date: normalizeDate(app.date),
