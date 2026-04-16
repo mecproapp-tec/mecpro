@@ -26,11 +26,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Aumentar limite de payload (10MB)
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  // Helmet com configurações amigáveis para CORS
   app.use(
     helmet({
       crossOriginResourcePolicy: false,
@@ -39,7 +37,7 @@ async function bootstrap() {
     }),
   );
 
-  // ================= CONFIGURAÇÃO CORS =================
+  // ================= CORS =================
   const defaultOrigins = [
     'https://www.mecpro.tec.br',
     'https://mecpro.tec.br',
@@ -81,32 +79,26 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'ngrok-skip-browser-warning',
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
     optionsSuccessStatus: 200,
   });
 
-  // 🔧 VALIDAÇÃO CORRIGIDA – permite campos extras (evita 400)
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,           // remove campos não declarados (não bloqueia)
-      forbidNonWhitelisted: false, // ← NÃO BLOQUEIA CAMPOS EXTRAS
-      transform: true,           // converte tipos automaticamente
+      whitelist: true,
+      forbidNonWhitelisted: false,
+      transform: true,
     }),
   );
 
-  app.setGlobalPrefix('api');
-
+  // 🔥 HEALTH CHECK – registrado ANTES do prefixo global
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.get('/health', (req, res) => {
-    res.status(200).json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-    });
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  // 🔥 PREFIXO GLOBAL (apenas para rotas da API)
+  app.setGlobalPrefix('api');
 
   const port = process.env.PORT || 3000;
   const host = '0.0.0.0';
@@ -119,9 +111,7 @@ async function bootstrap() {
     console.log(`✅ Servidor ouvindo em http://${host}:${port}`);
     console.log(`📡 Endereço real: ${JSON.stringify(address)}`);
     console.log(
-      `🚀 API rodando em ${
-        process.env.APP_URL || `http://localhost:${port}`
-      }`,
+      `🚀 API rodando em ${process.env.APP_URL || `http://localhost:${port}`}`,
     );
   } catch (err) {
     console.error('❌ Falha ao iniciar servidor:', err);

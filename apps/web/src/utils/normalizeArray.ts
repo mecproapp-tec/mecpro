@@ -1,4 +1,3 @@
-// src/utils/normalizeArray.ts
 export function normalizeArray<T>(data: any): T[] {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.data)) return data.data;
