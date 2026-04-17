@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiArrowLeft, FiUpload, FiTrash2, FiSave } from "react-icons/fi";
-import { getTenant, updateTenant, TenantData, UpdateTenantData } from "../../../services/tenant";
+import { getTenant, updateTenant } from "../../../services/tenant";
+import type { UpdateTenantData } from "../../../services/tenant";
 
 const DOCUMENT_CONFIG = {
   CPF: { max: 11, hint: "000.000.000-00" },
@@ -14,9 +15,11 @@ const DOCUMENT_CONFIG = {
   SA: { max: 14, hint: "00.000.000/0000-00" },
 };
 
+type TipoDocumento = keyof typeof DOCUMENT_CONFIG;
+
 interface OficinaData {
   nome: string;
-  tipoDocumento: keyof typeof DOCUMENT_CONFIG;
+  tipoDocumento: TipoDocumento;
   documento: string;
   numero: string;
   endereco: string;
@@ -24,6 +27,10 @@ interface OficinaData {
   email: string;
   logo?: string;
 }
+
+const isValidTipo = (tipo: string): tipo is TipoDocumento => {
+  return tipo in DOCUMENT_CONFIG;
+};
 
 export default function OficinaConfig() {
   const navigate = useNavigate();
@@ -45,9 +52,14 @@ export default function OficinaConfig() {
     const fetchData = async () => {
       try {
         const data = await getTenant();
+        // Garante que tipoDocumento seja uma chave válida
+        let tipoValido: TipoDocumento = "CPF";
+        if (data.tipoDocumento && isValidTipo(data.tipoDocumento)) {
+          tipoValido = data.tipoDocumento;
+        }
         setOficina({
           nome: data.nome || "",
-          tipoDocumento: (data.tipoDocumento as keyof typeof DOCUMENT_CONFIG) || "CPF",
+          tipoDocumento: tipoValido,
           documento: data.documento || "",
           numero: data.numero || "",
           endereco: data.endereco || "",
@@ -65,9 +77,9 @@ export default function OficinaConfig() {
     fetchData();
   }, []);
 
-  const formatDocumento = (value: string, tipo: string): string => {
+  const formatDocumento = (value: string, tipo: TipoDocumento): string => {
     const digits = value.replace(/\D/g, "");
-    const max = DOCUMENT_CONFIG[tipo as keyof typeof DOCUMENT_CONFIG]?.max || 14;
+    const max = DOCUMENT_CONFIG[tipo].max;
     const limited = digits.slice(0, max);
     if (tipo === "CPF") {
       return limited
@@ -88,10 +100,11 @@ export default function OficinaConfig() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === "tipoDocumento") {
-      const novoDocumento = formatDocumento(oficina.documento, value);
+      const novoTipo = value as TipoDocumento;
+      const novoDocumento = formatDocumento(oficina.documento, novoTipo);
       setOficina((prev) => ({
         ...prev,
-        tipoDocumento: value as keyof typeof DOCUMENT_CONFIG,
+        tipoDocumento: novoTipo,
         documento: novoDocumento.replace(/\D/g, ""),
       }));
     } else if (name === "documento") {
@@ -213,6 +226,7 @@ export default function OficinaConfig() {
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            {/* Nome */}
             <div>
               <label style={{ color: "#a0a0a0", display: "block", marginBottom: "8px" }}>Nome da Oficina</label>
               <input
@@ -232,6 +246,7 @@ export default function OficinaConfig() {
               />
             </div>
 
+            {/* Tipo e Documento */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "16px" }}>
               <div>
                 <label style={{ color: "#a0a0a0", display: "block", marginBottom: "8px" }}>Tipo</label>
@@ -279,6 +294,7 @@ export default function OficinaConfig() {
               </div>
             </div>
 
+            {/* Número (endereço) */}
             <div>
               <label style={{ color: "#a0a0a0", display: "block", marginBottom: "8px" }}>Número (endereço)</label>
               <input
@@ -298,6 +314,7 @@ export default function OficinaConfig() {
               />
             </div>
 
+            {/* Endereço */}
             <div>
               <label style={{ color: "#a0a0a0", display: "block", marginBottom: "8px" }}>Endereço (rua, bairro, cidade)</label>
               <input
@@ -317,6 +334,7 @@ export default function OficinaConfig() {
               />
             </div>
 
+            {/* Telefone */}
             <div>
               <label style={{ color: "#a0a0a0", display: "block", marginBottom: "8px" }}>Telefone</label>
               <input
@@ -336,6 +354,7 @@ export default function OficinaConfig() {
               />
             </div>
 
+            {/* Email */}
             <div>
               <label style={{ color: "#a0a0a0", display: "block", marginBottom: "8px" }}>Email</label>
               <input
@@ -355,6 +374,7 @@ export default function OficinaConfig() {
               />
             </div>
 
+            {/* Logo */}
             <div>
               <label style={{ color: "#a0a0a0", display: "block", marginBottom: "8px" }}>Logo da Oficina</label>
               <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
