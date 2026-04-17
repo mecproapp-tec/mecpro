@@ -29,7 +29,7 @@ export class StorageService {
 
     if (hasAllConfig) {
       try {
-        // 🔧 Configura o agente HTTPS para ignorar erros de SSL (necessário no Railway)
+        // 🔧 Cria um agente HTTPS que ignora erros de certificado (necessário no Railway)
         const agent = new Agent({
           rejectUnauthorized: false,
         });
