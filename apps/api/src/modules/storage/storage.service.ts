@@ -1,6 +1,8 @@
 import { Injectable, Logger, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { ConfigService } from '@nestjs/config';
+import { Agent } from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -23,16 +25,23 @@ export class StorageService {
     this.bucket = this.configService.get('CLOUDFLARE_R2_BUCKET_NAME');
     this.publicUrl = this.configService.get('CLOUDFLARE_R2_PUBLIC_URL');
 
-    // Verifica se todas as variáveis necessárias estão presentes
     const hasAllConfig = endpoint && accessKeyId && secretAccessKey && this.bucket && this.publicUrl;
-    
+
     if (hasAllConfig) {
       try {
+        // 🔧 Configura o agente HTTPS para ignorar erros de SSL (necessário no Railway)
+        const agent = new Agent({
+          rejectUnauthorized: false,
+        });
+
         this.s3Client = new S3Client({
           region: 'auto',
           endpoint,
           credentials: { accessKeyId, secretAccessKey },
           forcePathStyle: true,
+          requestHandler: new NodeHttpHandler({
+            httpsAgent: agent,
+          }),
         });
         this.useR2 = true;
         this.logger.log('✅ Cloudflare R2 configurado e ativo');
@@ -65,7 +74,6 @@ export class StorageService {
       throw new InternalServerErrorException('Buffer inválido para upload');
     }
 
-    // Garante extensão .pdf
     const normalizedKey = key.toLowerCase().endsWith('.pdf') ? key : `${key}.pdf`;
 
     if (this.useR2 && this.s3Client && this.bucket && this.publicUrl) {
@@ -83,7 +91,8 @@ export class StorageService {
         this.logger.log(`✅ PDF enviado para R2: ${url} (${buffer.length} bytes)`);
         return url;
       } catch (error) {
-        this.logger.error(`❌ Falha no upload R2: ${error.message}. Usando fallback local.`);
+        this.logger.error(`❌ Falha no upload R2: ${error.message}`);
+        this.logger.error(`Detalhes: ${JSON.stringify(error)}`);
         // Fallback para local
         return this.uploadPdfLocal(buffer, normalizedKey);
       }
