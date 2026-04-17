@@ -1,6 +1,9 @@
 // apps/api/src/main.ts
 process.env.TZ = 'America/Sao_Paulo';
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+if (process.env.NODE_ENV !== 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
 
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -13,7 +16,6 @@ async function bootstrap() {
   process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled Rejection:', reason);
   });
-
   process.on('uncaughtException', (err) => {
     console.error('❌ Uncaught Exception:', err);
   });
@@ -25,11 +27,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // BODY LIMIT
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  // HELMET
   app.use(
     helmet({
       crossOriginResourcePolicy: false,
@@ -38,7 +38,7 @@ async function bootstrap() {
     }),
   );
 
-  // 🔥 CORREÇÃO CRÍTICA — PREFLIGHT (CORS 405 FIX)
+  // Middleware para OPTIONS (preflight)
   app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
@@ -51,6 +51,7 @@ async function bootstrap() {
     'https://www.mecpro.tec.br',
     'https://mecpro.tec.br',
     'https://admin.mecpro.tec.br',
+    'https://api.mecpro.tec.br',
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:3000',
@@ -62,7 +63,6 @@ async function bootstrap() {
     .filter(Boolean);
 
   const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
-
   console.log('✅ CORS - Origens permitidas:', allowedOrigins);
 
   const isOriginAllowed = (origin: string): boolean => {
@@ -85,41 +85,46 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
     optionsSuccessStatus: 200,
   });
 
-  // VALIDATION
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
+      forbidNonWhitelisted: false,
     }),
   );
 
-  // HEALTH CHECK
-  const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/health', (req, res) => {
+  app.setGlobalPrefix('api');
+
+  // ================= HEALTH CHECK =================
+  // Obtém a instância do Express para definir a rota raw
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.get('/health', (req, res) => {
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
     });
   });
-
-  // PREFIXO GLOBAL
-  app.setGlobalPrefix('api');
 
   const port = process.env.PORT || 3000;
   const host = '0.0.0.0';
 
   try {
-    console.log(`📡 Iniciando em ${host}:${port}`);
-    await app.listen(port, host);
+    console.log(`📡 Tentando iniciar servidor em ${host}:${port}`);
+    const server = await app.listen(port, host);
+    const address = server.address();
 
-    console.log(`✅ Servidor rodando`);
-    console.log(`🌐 URL: ${process.env.APP_URL || `http://localhost:${port}`}`);
+    console.log(`✅ Servidor ouvindo em http://${host}:${port}`);
+    console.log(`📡 Endereço real: ${JSON.stringify(address)}`);
+    console.log(
+      `🚀 API rodando em ${process.env.APP_URL || `http://localhost:${port}`}`,
+    );
   } catch (err) {
-    console.error('❌ Falha ao iniciar:', err);
+    console.error('❌ Falha ao iniciar servidor:', err);
     process.exit(1);
   }
 }
