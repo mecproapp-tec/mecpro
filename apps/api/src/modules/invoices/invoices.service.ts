@@ -80,7 +80,8 @@ export class InvoicesService {
   private async generatePdfNow(invoice: any) {
     try {
       const pdfBuffer = await this.invoicesPdfService.generateInvoicePdf(invoice);
-      const pdfKey = `${invoice.tenantId}/invoices/${invoice.id}.pdf`;
+      // 🔥 CORREÇÃO: usar o número da fatura (invoice.number) em vez do ID numérico
+      const pdfKey = `${invoice.tenantId}/invoices/${invoice.number}.pdf`;
       const pdfUrl = await this.storageService.uploadPdf(pdfBuffer, pdfKey);
       await this.prisma.invoice.update({
         where: { id: invoice.id },
