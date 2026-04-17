@@ -12,6 +12,7 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { json, urlencoded } from 'express';
 import { join } from 'path';
+import * as express from 'express'; // ✅ Importação adicionada
 
 async function bootstrap() {
   process.on('unhandledRejection', (reason) => {
