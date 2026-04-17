@@ -27,28 +27,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Aumentar limite de payload (10MB)
-  app.use(json({ limit: '10mb' }));
-  app.use(urlencoded({ extended: true, limit: '10mb' }));
-
-  // Helmet com configurações amigáveis para CORS
-  app.use(
-    helmet({
-      crossOriginResourcePolicy: false,
-      crossOriginOpenerPolicy: false,
-      crossOriginEmbedderPolicy: false,
-    }),
-  );
-
-  // Middleware manual para OPTIONS (preflight)
-  app.use((req, res, next) => {
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
-
-  // ================= CORS =================
+  // ================= CORS (deve vir primeiro) =================
   const defaultOrigins = [
     'https://www.mecpro.tec.br',
     'https://mecpro.tec.br',
@@ -91,7 +70,19 @@ async function bootstrap() {
     optionsSuccessStatus: 200,
   });
 
-  // Validação global
+  // ================= Middlewares padrão =================
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
+
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false,
+      crossOriginOpenerPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
+  // ================= Validação global =================
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -100,12 +91,12 @@ async function bootstrap() {
     }),
   );
 
-  // Prefixo global para todas as rotas da API
+  // ================= Prefixo global =================
   app.setGlobalPrefix('api');
 
   // ================= HEALTH CHECK =================
-  // Rota sem prefixo (compatibilidade)
   const expressApp = app.getHttpAdapter().getInstance();
+  // Rota sem prefixo (compatibilidade)
   expressApp.get('/health', (req, res) => {
     res.status(200).json({
       status: 'ok',
@@ -113,7 +104,6 @@ async function bootstrap() {
       uptime: process.uptime(),
     });
   });
-
   // Rota com prefixo /api (para seguir o padrão)
   expressApp.get('/api/health', (req, res) => {
     res.status(200).json({
@@ -123,7 +113,7 @@ async function bootstrap() {
     });
   });
 
-  // Inicialização do servidor
+  // ================= Inicialização do servidor =================
   const port = process.env.PORT || 3000;
   const host = '0.0.0.0';
 
