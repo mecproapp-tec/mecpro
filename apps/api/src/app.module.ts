@@ -10,7 +10,8 @@ import { StorageModule } from './modules/storage/storage.module';
 import { PdfModule } from './modules/pdf/pdf.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
-import { PublicShareModule } from './modules/public-share/public-share.module'; 
+import { PublicShareModule } from './modules/public-share/public-share.module';
+import { TenantsModule } from './modules/tenants/tenants.module'; 
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PublicShareModule } from './modules/public-share/public-share.module';
     NotificationsModule,
     AppointmentsModule,
     PublicShareModule,
+    TenantsModule, 
   ],
   controllers: [AppController],
   providers: [AppService],
