@@ -1,7 +1,3 @@
-
-
-
-
 import {
   Injectable,
   Logger,
@@ -31,10 +27,7 @@ export class StorageService {
     this.localUploadPath = path.join(process.cwd(), 'uploads', 'pdfs');
     this.ensureLocalDirectory();
 
-    this.logger.log(`R2 Endpoint: ${endpoint}`);
-    this.logger.log(`R2 Key: ${accessKeyId?.slice(0, 5)}...`);
-    this.logger.log(`Use R2: ${hasAllConfig}`);
-
+    // 🔹 Variáveis
     const endpoint = this.configService.get<string>('CLOUDFLARE_R2_ENDPOINT');
     const accessKeyId = this.configService.get<string>('CLOUDFLARE_R2_ACCESS_KEY_ID');
     const secretAccessKey = this.configService.get<string>('CLOUDFLARE_R2_SECRET_ACCESS_KEY');
@@ -43,6 +36,11 @@ export class StorageService {
 
     const hasAllConfig =
       endpoint && accessKeyId && secretAccessKey && this.bucket && this.publicUrl;
+
+    // 🔹 Logs de diagnóstico
+    this.logger.log(`R2 Endpoint: ${endpoint}`);
+    this.logger.log(`R2 Key: ${accessKeyId?.slice(0, 5)}...`);
+    this.logger.log(`Use R2: ${!!hasAllConfig}`);
 
     if (hasAllConfig) {
       try {
@@ -59,10 +57,9 @@ export class StorageService {
         this.useR2 = true;
 
         this.logger.log('✅ Cloudflare R2 configurado e ativo');
-        this.logger.log(`Endpoint: ${endpoint}`);
         this.logger.log(`Bucket: ${this.bucket}`);
         this.logger.log(`Public URL: ${this.publicUrl}`);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`❌ Erro ao configurar cliente R2: ${error.message}`);
         this.useR2 = false;
       }
@@ -82,9 +79,7 @@ export class StorageService {
 
   async uploadPdf(buffer: Buffer, key: string): Promise<string> {
     if (!buffer || buffer.length === 0) {
-      throw new InternalServerErrorException(
-        'Buffer inválido para upload',
-      );
+      throw new InternalServerErrorException('Buffer inválido para upload');
     }
 
     const normalizedKey = key.toLowerCase().endsWith('.pdf')
@@ -110,11 +105,11 @@ export class StorageService {
         );
 
         return url;
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(`❌ Falha no upload R2: ${error.message}`);
         this.logger.error(`Detalhes: ${JSON.stringify(error)}`);
 
-        // fallback seguro
+        // fallback
         return this.uploadPdfLocal(buffer, normalizedKey);
       }
     }
@@ -122,10 +117,7 @@ export class StorageService {
     return this.uploadPdfLocal(buffer, normalizedKey);
   }
 
-  private async uploadPdfLocal(
-    buffer: Buffer,
-    key: string,
-  ): Promise<string> {
+  private async uploadPdfLocal(buffer: Buffer, key: string): Promise<string> {
     const localPath = path.join(this.localUploadPath, key);
     const dir = path.dirname(localPath);
 
@@ -169,10 +161,8 @@ export class StorageService {
           stream.on('end', () => resolve(Buffer.concat(chunks)));
           stream.on('error', reject);
         });
-      } catch (error) {
-        this.logger.warn(
-          `Arquivo não encontrado no R2: ${key}, tentando local...`,
-        );
+      } catch {
+        this.logger.warn(`Arquivo não encontrado no R2: ${key}, tentando local...`);
       }
     }
 
@@ -196,10 +186,8 @@ export class StorageService {
         );
 
         this.logger.log(`🗑️ Arquivo removido do R2: ${key}`);
-      } catch (error) {
-        this.logger.error(
-          `Erro ao deletar do R2: ${error.message}`,
-        );
+      } catch (error: any) {
+        this.logger.error(`Erro ao deletar do R2: ${error.message}`);
       }
     }
 
