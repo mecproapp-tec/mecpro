@@ -43,13 +43,16 @@ const styles: { [key: string]: React.CSSProperties } = {
   sectionTitle: { fontSize: "28px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "12px", color: "#e0e0e0" },
   icon: { color: "#00e5ff" },
   tableWrapper: { background: "#111", borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px #00e5ff20" },
-  table: { width: "100%", borderCollapse: "collapse", minWidth: "500px" },
+  table: { width: "100%", borderCollapse: "collapse", minWidth: "600px" },
+  th: { textAlign: "left", padding: "16px", backgroundColor: "#0f0f0f", color: "#00e5ff", fontWeight: "600", borderBottom: "2px solid #00e5ff30" },
+  td: { padding: "16px", borderBottom: "1px solid #00e5ff20" },
   actionButton: { background: "#1a1a1a", border: "1px solid #00e5ff30", width: "36px", height: "36px", borderRadius: "10px", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#00e5ff" },
   emptyMessage: { background: "#111", borderRadius: "24px", padding: "40px", textAlign: "center", color: "#888", boxShadow: "0 20px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px #00e5ff20" },
   loadingContainer: { background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" },
   loading: { color: "#00e5ff", fontSize: "18px" },
   errorContainer: { background: "linear-gradient(145deg, #0a0a0a 0%, #000000 100%)", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ff4444" },
   eyeButton: { background: "transparent", border: "none", color: "#00e5ff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px", borderRadius: "8px" },
+  totalCell: { textAlign: "right", fontWeight: "600", color: "#00e5ff" },
 };
 
 function calculateTotalWithIss(items?: Invoice["items"]): number {
@@ -73,6 +76,37 @@ function maskDocumentNumber(type: string, number: string): string {
     default: return "•".repeat(digits.length);
   }
 }
+
+// 🔥 Mapeamento de status padronizado
+const getEstimateStatusLabel = (status: string): { label: string; color: string } => {
+  switch (status) {
+    case "DRAFT":   return { label: "Pendente", color: "#ffaa00" };
+    case "SENT":    return { label: "Enviado", color: "#00e5ff" };
+    case "APPROVED":return { label: "Aceito", color: "#00ff88" };
+    case "CONVERTED":return { label: "Convertido", color: "#6c757d" };
+    default:        return { label: status, color: "#ffffff" };
+  }
+};
+
+const getInvoiceStatusLabel = (status: string): { label: string; color: string } => {
+  switch (status) {
+    case "PENDING": return { label: "Pendente", color: "#ffaa00" };
+    case "PAID":    return { label: "Paga", color: "#00ff88" };
+    case "CANCELED":return { label: "Cancelada", color: "#ff4444" };
+    default:        return { label: status, color: "#ffffff" };
+  }
+};
+
+const getStatusBadge = (status: string, type: "estimate" | "invoice" = "estimate") => {
+  const { label, color } = type === "estimate" 
+    ? getEstimateStatusLabel(status) 
+    : getInvoiceStatusLabel(status);
+  return (
+    <span style={{ background: "#1a1a1a", color, padding: "6px 12px", borderRadius: "100px", fontWeight: "600", fontSize: "0.85rem", display: "inline-block", border: `1px solid ${color}40` }}>
+      {label}
+    </span>
+  );
+};
 
 export default function DetalhesCliente() {
   const { id } = useParams<{ id: string }>();
@@ -109,7 +143,6 @@ export default function DetalhesCliente() {
         const response = await getEstimates();
         const estimates = response.data || [];
         estimatesData = Array.isArray(estimates) ? estimates : [];
-        // 🔥 Converte total para número
         estimatesData = estimatesData.map(e => ({ ...e, total: typeof e.total === 'string' ? parseFloat(e.total) : e.total }));
       } catch (err) { console.warn("Erro ao carregar orçamentos:", err); }
       setOrcamentos(estimatesData.filter(e => e.clientId === clientId));
@@ -118,7 +151,6 @@ export default function DetalhesCliente() {
       try {
         const data = await getInvoices();
         invoicesData = Array.isArray(data) ? data : [];
-        // 🔥 Converte total para número
         invoicesData = invoicesData.map(i => ({ ...i, total: typeof i.total === 'string' ? parseFloat(i.total) : i.total }));
       } catch (err) { console.warn("Erro ao carregar faturas:", err); }
       setFaturas(invoicesData.filter(i => i.clientId === clientId));
@@ -176,6 +208,7 @@ export default function DetalhesCliente() {
 
   const handlePDFOrcamento = (orcamento: Estimate) => {
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
+    const { label: statusLabel } = getEstimateStatusLabel(orcamento.status);
     const win = window.open("", "_blank");
     if (!win) return;
 
@@ -212,11 +245,7 @@ export default function DetalhesCliente() {
           <p><strong>Veículo:</strong> ${cliente ? getVehicleDisplay(cliente) : "Não informado"}</p>
           <p><strong>Placa:</strong> ${cliente?.plate || ""}</p>
           <p><strong>Data:</strong> ${new Date(orcamento.date).toLocaleDateString("pt-BR")}</p>
-          <p><strong>Status:</strong> ${
-            orcamento.status === "DRAFT" ? "Pendente" :
-            orcamento.status === "APPROVED" ? "Aceito" :
-            orcamento.status === "CONVERTED" ? "Convertido" : orcamento.status
-          }</p>
+          <p><strong>Status:</strong> ${statusLabel}</p>
           <div class="details"><h3>Itens</h3>
           <table><thead><tr><th>Descrição</th><th class="valor">Valor (R$)</th><th class="valor">ISS (%)</th><th class="valor">Total c/ ISS (R$)</th></tr></thead>
           <tbody>${orcamento.items.map(item => {
@@ -243,6 +272,7 @@ export default function DetalhesCliente() {
   const handlePDFFatura = (fatura: Invoice) => {
     const oficina = JSON.parse(localStorage.getItem("oficina") || "{}");
     const totalComIss = calculateTotalWithIss(fatura.items);
+    const { label: statusLabel } = getInvoiceStatusLabel(fatura.status);
     const win = window.open("", "_blank");
     if (!win) return;
 
@@ -280,11 +310,7 @@ export default function DetalhesCliente() {
           <p><strong>Veículo:</strong> ${cliente ? getVehicleDisplay(cliente) : "Não informado"}</p>
           <p><strong>Placa:</strong> ${cliente?.plate || ""}</p>
           <p><strong>Data:</strong> ${new Date(fatura.createdAt).toLocaleDateString("pt-BR")}</p>
-          <p><strong>Status:</strong> ${
-            fatura.status === "PAID" ? "Paga" :
-            fatura.status === "PENDING" ? "Pendente" :
-            fatura.status === "CANCELED" ? "Cancelada" : fatura.status
-          }</p>
+          <p><strong>Status:</strong> ${statusLabel}</p>
           <div class="details"><h3>Itens</h3>
           <table><thead><tr><th>Descrição</th><th class="valor">Qtd</th><th class="valor">Preço Unit.</th><th class="valor">ISS (%)</th><th class="valor">Total c/ ISS</th></tr></thead>
           <tbody>${fatura.items.map(item => {
@@ -312,22 +338,6 @@ export default function DetalhesCliente() {
 
   const formatDate = (dateStr: string) => {
     try { return new Date(dateStr).toLocaleDateString("pt-BR"); } catch { return dateStr; }
-  };
-
-  const getStatusBadge = (status: string) => {
-    let color = "#ffaa00";
-    let label = status;
-    if (status === "PAID") { color = "#00ff88"; label = "Pago"; }
-    else if (status === "CONVERTED") { color = "#00ff88"; label = "Convertido"; }
-    else if (status === "APPROVED") { color = "#00e5ff"; label = "Aceito"; }
-    else if (status === "PENDING") { color = "#ffaa00"; label = "Pendente"; }
-    else if (status === "CANCELED") { color = "#ff4444"; label = "Cancelado"; }
-    else if (status === "DRAFT") { color = "#6c757d"; label = "Rascunho"; }
-    return (
-      <span style={{ background: "#1a1a1a", color, padding: "6px 12px", borderRadius: "100px", fontWeight: "600", fontSize: "0.85rem", display: "inline-block", border: `1px solid ${color}40` }}>
-        {label}
-      </span>
-    );
   };
 
   if (loading) {
@@ -368,19 +378,27 @@ export default function DetalhesCliente() {
         </div>
 
         <div style={styles.sections}>
+          {/* Orçamentos */}
           <section>
             <h3 style={styles.sectionTitle}><FiFileText style={styles.icon} /> Orçamentos ({orcamentos.length})</h3>
             {orcamentos.length > 0 ? (
               <div style={styles.tableWrapper}>
                 <table style={styles.table}>
-                  <thead><tr><th>Data</th><th>Total</th><th>Status</th><th>Ações</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Data</th>
+                      <th style={styles.th}>Total</th>
+                      <th style={styles.th}>Status</th>
+                      <th style={styles.th}>Ações</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {orcamentos.map((orc, idx) => (
                       <tr key={orc.id} style={{ background: idx % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }}>
-                        <td>{formatDate(orc.date)}</td>
-                        <td style={{ color: "#00e5ff", fontWeight: "600" }}>R$ {Number(orc.total).toFixed(2)}</td>
-                        <td>{getStatusBadge(orc.status)}</td>
-                        <td style={{ textAlign: "center" }}>
+                        <td style={styles.td}>{formatDate(orc.date)}</td>
+                        <td style={{ ...styles.td, ...styles.totalCell }}>R$ {Number(orc.total).toFixed(2)}</td>
+                        <td style={styles.td}>{getStatusBadge(orc.status, "estimate")}</td>
+                        <td style={{ ...styles.td, textAlign: "center" }}>
                           <button onClick={() => handlePDFOrcamento(orc)} style={styles.actionButton} title="Visualizar orçamento"><FiEye size={16} /></button>
                         </td>
                       </tr>
@@ -393,20 +411,29 @@ export default function DetalhesCliente() {
             )}
           </section>
 
+          {/* Faturas */}
           <section>
             <h3 style={styles.sectionTitle}><FiDollarSign style={styles.icon} /> Faturas ({faturas.length})</h3>
             {faturas.length > 0 ? (
               <div style={styles.tableWrapper}>
                 <table style={styles.table}>
-                  <thead><tr><th>Data</th><th>Número</th><th>Total</th><th>Status</th><th>Ações</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Data</th>
+                      <th style={styles.th}>Número</th>
+                      <th style={styles.th}>Total</th>
+                      <th style={styles.th}>Status</th>
+                      <th style={styles.th}>Ações</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {faturas.map((fat, idx) => (
                       <tr key={fat.id} style={{ background: idx % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }}>
-                        <td>{formatDate(fat.createdAt)}</td>
-                        <td>{fat.number}</td>
-                        <td style={{ color: "#00e5ff", fontWeight: "600" }}>R$ {Number(fat.total).toFixed(2)}</td>
-                        <td>{getStatusBadge(fat.status)}</td>
-                        <td style={{ textAlign: "center" }}>
+                        <td style={styles.td}>{formatDate(fat.createdAt)}</td>
+                        <td style={styles.td}>{fat.number}</td>
+                        <td style={{ ...styles.td, ...styles.totalCell }}>R$ {Number(fat.total).toFixed(2)}</td>
+                        <td style={styles.td}>{getStatusBadge(fat.status, "invoice")}</td>
+                        <td style={{ ...styles.td, textAlign: "center" }}>
                           <button onClick={() => handlePDFFatura(fat)} style={styles.actionButton} title="Visualizar fatura"><FiEye size={16} /></button>
                         </td>
                       </tr>
@@ -419,12 +446,20 @@ export default function DetalhesCliente() {
             )}
           </section>
 
+          {/* Agendamentos */}
           <section>
             <h3 style={styles.sectionTitle}><FiClock style={styles.icon} /> Agendamentos ({agendamentos.length})</h3>
             {agendamentos.length > 0 ? (
               <div style={styles.tableWrapper}>
                 <table style={styles.table}>
-                  <thead><tr><th>Data</th><th>Hora</th><th>Observações</th><th>Ações</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Data</th>
+                      <th style={styles.th}>Hora</th>
+                      <th style={styles.th}>Observações</th>
+                      <th style={styles.th}>Ações</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {agendamentos.map((agd, idx) => {
                       const data = new Date(agd.date);
@@ -432,10 +467,10 @@ export default function DetalhesCliente() {
                       const horaStr = data.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
                       return (
                         <tr key={agd.id} style={{ background: idx % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }}>
-                          <td>{dataStr}</td>
-                          <td>{horaStr}</td>
-                          <td style={{ color: "#b0b0b0" }}>{agd.comment || "-"}</td>
-                          <td style={{ textAlign: "center" }}>
+                          <td style={styles.td}>{dataStr}</td>
+                          <td style={styles.td}>{horaStr}</td>
+                          <td style={styles.td}>{agd.comment || "-"}</td>
+                          <td style={{ ...styles.td, textAlign: "center" }}>
                             <button onClick={() => handleDeleteAgendamento(agd.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir"><FiTrash2 size={16} /></button>
                           </td>
                         </tr>
