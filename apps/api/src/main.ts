@@ -1,9 +1,12 @@
 // apps/api/src/main.ts
+
 process.env.TZ = 'America/Sao_Paulo';
 
-if (process.env.NODE_ENV !== 'production') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
+// 🔥 CORREÇÃO CRÍTICA (R2 / TLS / Proxy)
+delete process.env.HTTP_PROXY;
+delete process.env.HTTPS_PROXY;
+delete process.env.http_proxy;
+delete process.env.https_proxy;
 
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -12,12 +15,13 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { json, urlencoded } from 'express';
 import { join } from 'path';
-import * as express from 'express'; // ✅ Importação adicionada
+import * as express from 'express';
 
 async function bootstrap() {
   process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled Rejection:', reason);
   });
+
   process.on('uncaughtException', (err) => {
     console.error('❌ Uncaught Exception:', err);
   });
@@ -29,7 +33,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // ================= CORS (deve vir primeiro) =================
+  // ================= CORS =================
   const defaultOrigins = [
     'https://www.mecpro.tec.br',
     'https://mecpro.tec.br',
@@ -46,6 +50,7 @@ async function bootstrap() {
     .filter(Boolean);
 
   const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
+
   console.log('✅ CORS - Origens permitidas:', allowedOrigins);
 
   const isOriginAllowed = (origin: string): boolean => {
@@ -72,7 +77,7 @@ async function bootstrap() {
     optionsSuccessStatus: 200,
   });
 
-  // ================= Middlewares padrão =================
+  // ================= Middlewares =================
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
@@ -84,10 +89,10 @@ async function bootstrap() {
     }),
   );
 
-  // ================= Arquivos estáticos (fallback local) =================
+  // ================= Arquivos estáticos =================
   app.use('/api/storage', express.static(join(__dirname, '..', 'uploads', 'pdfs')));
 
-  // ================= Validação global =================
+  // ================= Validação =================
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -96,11 +101,12 @@ async function bootstrap() {
     }),
   );
 
-  // ================= Prefixo global =================
+  // ================= Prefixo =================
   app.setGlobalPrefix('api');
 
-  // ================= HEALTH CHECK =================
+  // ================= Health Check =================
   const expressApp = app.getHttpAdapter().getInstance();
+
   expressApp.get('/health', (req, res) => {
     res.status(200).json({
       status: 'ok',
@@ -108,6 +114,7 @@ async function bootstrap() {
       uptime: process.uptime(),
     });
   });
+
   expressApp.get('/api/health', (req, res) => {
     res.status(200).json({
       status: 'ok',
@@ -116,12 +123,13 @@ async function bootstrap() {
     });
   });
 
-  // ================= Inicialização do servidor =================
+  // ================= Start Server =================
   const port = process.env.PORT || 3000;
   const host = '0.0.0.0';
 
   try {
     console.log(`📡 Tentando iniciar servidor em ${host}:${port}`);
+
     const server = await app.listen(port, host);
     const address = server.address();
 

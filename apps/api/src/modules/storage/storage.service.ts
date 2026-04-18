@@ -10,6 +10,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -27,7 +28,7 @@ export class StorageService {
     this.localUploadPath = path.join(process.cwd(), 'uploads', 'pdfs');
     this.ensureLocalDirectory();
 
-    // 🔹 Variáveis
+    // 🔹 ENV
     const endpoint = this.configService.get<string>('CLOUDFLARE_R2_ENDPOINT');
     const accessKeyId = this.configService.get<string>('CLOUDFLARE_R2_ACCESS_KEY_ID');
     const secretAccessKey = this.configService.get<string>('CLOUDFLARE_R2_SECRET_ACCESS_KEY');
@@ -37,7 +38,7 @@ export class StorageService {
     const hasAllConfig =
       endpoint && accessKeyId && secretAccessKey && this.bucket && this.publicUrl;
 
-    // 🔹 Logs de diagnóstico
+    // 🔹 DEBUG
     this.logger.log(`R2 Endpoint: ${endpoint}`);
     this.logger.log(`R2 Key: ${accessKeyId?.slice(0, 5)}...`);
     this.logger.log(`Use R2: ${!!hasAllConfig}`);
@@ -52,6 +53,12 @@ export class StorageService {
             secretAccessKey,
           },
           forcePathStyle: true,
+
+          // 🔥 CORREÇÃO CRÍTICA (REMOVE INTERFERÊNCIA DE PROXY/TLS)
+          requestHandler: new NodeHttpHandler({
+            connectionTimeout: 5000,
+            socketTimeout: 5000,
+          }),
         });
 
         this.useR2 = true;
@@ -109,7 +116,6 @@ export class StorageService {
         this.logger.error(`❌ Falha no upload R2: ${error.message}`);
         this.logger.error(`Detalhes: ${JSON.stringify(error)}`);
 
-        // fallback
         return this.uploadPdfLocal(buffer, normalizedKey);
       }
     }
@@ -156,7 +162,6 @@ export class StorageService {
 
         return new Promise((resolve, reject) => {
           const chunks: Buffer[] = [];
-
           stream.on('data', (chunk: Buffer) => chunks.push(chunk));
           stream.on('end', () => resolve(Buffer.concat(chunks)));
           stream.on('error', reject);
