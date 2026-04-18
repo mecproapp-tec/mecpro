@@ -1,3 +1,9 @@
+
+this.logger.log(`R2 Endpoint: ${endpoint}`);
+this.logger.log(`R2 Key: ${accessKeyId?.slice(0, 5)}...`);
+this.logger.log(`Use R2: ${hasAllConfig}`);
+
+
 import {
   Injectable,
   Logger,

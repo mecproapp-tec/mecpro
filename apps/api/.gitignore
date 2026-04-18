@@ -59,3 +59,12 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 .vercel
 .env*.local
+
+# Segurança extra
+.env*
+
+# Uploads locais (fallback)
+uploads/
+
+# Prisma local cache (opcional)
+node_modules/.prisma
