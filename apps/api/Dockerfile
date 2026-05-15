@@ -14,7 +14,7 @@ RUN npx prisma generate
 COPY . .
 RUN npm run build
 
-# Copia templates .hbs (se existirem) – sem redirecionamento de erro
+# Copia templates .hbs (se existirem) – sem redirecionamento no COPY
 RUN mkdir -p dist/modules/estimates dist/modules/invoices && \
     (cp src/modules/estimates/*.hbs dist/modules/estimates/ 2>/dev/null || true) && \
     (cp src/modules/invoices/*.hbs dist/modules/invoices/ 2>/dev/null || true)
