@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* ===============================
+   ANIMAÇÃO SLIDE-IN
+=============================== */
+@keyframes slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
+/* ===============================
+   CURSOR E SELEÇÃO GLOBAL
+=============================== */
+
+/* Remove o cursor de texto (I-beam) de TODOS os elementos por padrão */
+* {
+  cursor: default;
+  user-select: none; /* impede seleção acidental de texto */
+}
+
+/* Restaura o cursor de texto APENAS em campos editáveis */
+input:not([readonly]),
+textarea:not([readonly]) {
+  cursor: text;
+  user-select: auto;
+  caret-color: auto;
+}
+
+/* Restaura o cursor de mão em elementos interativos */
+button,
+a,
+[role="button"],
+[onclick],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+select,
+summary,
+label {
+  cursor: pointer;
+}
+
+/* Inputs e textareas readonly ficam sem cursor e não selecionáveis */
+input[readonly],
+textarea[readonly] {
+  caret-color: transparent;
+  cursor: default;
+  user-select: none;
+  background-color: var(--color-gray-100, #f3f4f6);
+  color: var(--color-gray-700, #374151);
+}
+
+/* Classes auxiliares (caso queira usar manualmente) */
+.no-text-cursor {
+  caret-color: transparent;
+  cursor: default;
+  user-select: none;
+}
+
+.no-select {
+  user-select: none;
+}
+
+/* Foco visual apenas em campos editáveis */
+input:not([readonly]):focus,
+textarea:not([readonly]):focus {
+  outline: none;
+  ring: 2px solid var(--color-neonBlue, #00e5ff);
+}

@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "assets": [
+      {
+        "include": "modules/**/*.hbs",
+        "outDir": "dist"
+      }
+    ],
+    "watchAssets": true
+  }
+}

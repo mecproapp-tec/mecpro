@@ -1,0 +1,175 @@
+// ================= 🔥 CARREGAR .env CORRETO PRIMEIRO =================
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+const envFile =
+  process.env.NODE_ENV === 'production'
+    ? '.env.production'
+    : '.env.development';
+
+config({ path: resolve(__dirname, '..', envFile) });
+
+console.log(`📁 Carregando configurações de: ${envFile}`);
+console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV}`);
+// ============================================================
+
+process.env.TZ = 'America/Sao_Paulo';
+
+delete process.env.HTTP_PROXY;
+delete process.env.HTTPS_PROXY;
+delete process.env.http_proxy;
+delete process.env.https_proxy;
+
+import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+import helmet from 'helmet';
+import { json, urlencoded } from 'express';
+import { join } from 'path';
+import * as express from 'express';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { Reflector } from '@nestjs/core';
+import { TenantInterceptor } from './shared/prisma/tenant.interceptor';
+
+async function bootstrap() {
+  process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled Rejection:', reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err);
+  });
+
+  console.log('🚀 Iniciando aplicação...');
+  console.log(`📦 NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`🔍 PORT env: ${process.env.PORT}`);
+  console.log(`🔍 APP_URL env: ${process.env.APP_URL}`);
+  console.log(`🔍 FRONTEND_URL: ${process.env.FRONTEND_URL}`);
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // ================= CORS =================
+  const defaultOrigins = [
+    'https://www.mecpro.tec.br',
+    'https://mecpro.tec.br',
+    'https://admin.mecpro.tec.br',
+    'https://api.mecpro.tec.br',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000',
+    'https://unfetching-overslavishly-maxie.ngrok-free.dev',
+    'https://*.ngrok-free.dev',
+  ];
+
+  const envOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  const allowedOrigins = [...new Set([...defaultOrigins, ...envOrigins])];
+
+  console.log('✅ CORS - Origens permitidas:', allowedOrigins);
+
+  const isOriginAllowed = (origin: string): boolean => {
+    if (!origin) return true;
+    if (allowedOrigins.includes(origin)) return true;
+    if (origin.includes('localhost')) return true;
+    if (origin.match(/^https?:\/\/.*\.mecpro\.tec\.br$/)) return true;
+    if (origin.match(/^https?:\/\/.*\.vercel\.app$/)) return true;
+    if (origin.match(/^https?:\/\/.*\.ngrok-free\.dev$/)) return true;
+    return false;
+  };
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`❌ CORS bloqueado para origem: ${origin}`);
+        callback(new Error(`Origem não permitida: ${origin}`));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
+    optionsSuccessStatus: 200,
+  });
+
+  // ================= BODY PARSERS (CORRETO) =================
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
+
+  // ================= SECURITY =================
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false,
+      crossOriginOpenerPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
+  // ================= STATIC FILES =================
+  app.use(
+    '/api/storage',
+    express.static(join(__dirname, '..', 'uploads', 'pdfs')),
+  );
+
+  // ================= VALIDATION =================
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: false,
+    }),
+  );
+
+  // ================= INTERCEPTOR TENANT =================
+  app.useGlobalInterceptors(new TenantInterceptor());
+
+  app.setGlobalPrefix('api');
+
+  // ================= GUARDS GLOBAIS =================
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(new JwtAuthGuard(reflector));
+
+  // ================= DEBUG ROUTES =================
+  const expressApp = app.getHttpAdapter().getInstance();
+
+  expressApp.get('/health', (req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  });
+
+  expressApp.get('/api/health', (req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  });
+
+  const port = process.env.PORT || 3000;
+  const host = '0.0.0.0';
+
+  try {
+    console.log(`📡 Tentando iniciar servidor em ${host}:${port}`);
+
+    const server = await app.listen(port, host);
+    const address = server.address();
+
+    console.log(`✅ Servidor ouvindo em http://${host}:${port}`);
+    console.log(`📡 Endereço real: ${JSON.stringify(address)}`);
+    console.log(
+      `🚀 API rodando em ${process.env.APP_URL || `http://localhost:${port}`}`,
+    );
+  } catch (err) {
+    console.error('❌ Falha ao iniciar servidor:', err);
+    process.exit(1);
+  }
+}
+
+bootstrap();
