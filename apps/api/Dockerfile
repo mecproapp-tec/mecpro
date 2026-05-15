@@ -1,9 +1,7 @@
-# apps/api/Dockerfile
 FROM node:20-bullseye AS builder
 
 WORKDIR /app
 
-# Instala apenas o necessário para compilar (sem Chromium)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -16,10 +14,13 @@ RUN npx prisma generate
 COPY . .
 RUN npm run build
 
-# ================= RUNTIME =================
+# Copia templates .hbs (se existirem) – sem redirecionamento de erro
+RUN mkdir -p dist/modules/estimates dist/modules/invoices && \
+    (cp src/modules/estimates/*.hbs dist/modules/estimates/ 2>/dev/null || true) && \
+    (cp src/modules/invoices/*.hbs dist/modules/invoices/ 2>/dev/null || true)
+
 FROM node:20-bullseye
 
-# Instala Chromium APENAS no runtime
 RUN apt-get update && apt-get install -y \
     chromium \
     ca-certificates \
@@ -57,11 +58,6 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
 
-# Copia templates (se existirem)
-COPY apps/api/src/modules/estimates/*.hbs ./dist/modules/estimates/ 2>/dev/null || true
-COPY apps/api/src/modules/invoices/*.hbs ./dist/modules/invoices/ 2>/dev/null || true
-
 EXPOSE 3000
 
-# 🔥 Executa migrations antes de iniciar
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
