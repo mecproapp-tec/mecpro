@@ -7,17 +7,20 @@ import {
   Param,
   Delete,
   Put,
-  Patch, // ✅ ADICIONADO
+  Patch,
   UseGuards,
   HttpCode,
   HttpStatus,
   BadRequestException,
   UnauthorizedException,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { InvoicesService } from './invoices.service';
+import { InvoicesPdfService } from './invoices-pdf.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 
@@ -31,7 +34,10 @@ interface UserPayload {
 @UseGuards(JwtAuthGuard)
 @Controller('invoices')
 export class InvoicesController {
-  constructor(private readonly invoicesService: InvoicesService) {}
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly pdfService: InvoicesPdfService,
+  ) {}
 
   @Get()
   async findAll(
@@ -48,6 +54,18 @@ export class InvoicesController {
   async findOne(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     if (!user?.tenantId) throw new BadRequestException('TenantId não encontrado');
     return this.invoicesService.findOne(Number(id), user.tenantId);
+  }
+
+  @Get(':id/pdf')
+  async downloadPdf(@Param('id') id: string, @CurrentUser() user: UserPayload, @Res() res: Response) {
+    if (!user?.tenantId) throw new BadRequestException('TenantId não encontrado');
+    const invoice = await this.invoicesService.findOne(Number(id), user.tenantId);
+    if (!invoice) throw new BadRequestException('Fatura não encontrada');
+    const pdfBuffer = await this.pdfService.generateInvoicePdf(invoice);
+    const filename = `fatura-${invoice.number}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(pdfBuffer);
   }
 
   @Get(':id/share')
@@ -70,7 +88,6 @@ export class InvoicesController {
     return this.invoicesService.create(user.tenantId, createDto);
   }
 
-  // ✅ PUT (mantido)
   @Put(':id')
   async update(
     @Param('id') id: string,
@@ -81,7 +98,6 @@ export class InvoicesController {
     return this.invoicesService.update(Number(id), user.tenantId, updateDto);
   }
 
-  // ✅ PATCH (NOVO - resolve seu erro 404)
   @Patch(':id')
   async updatePartial(
     @Param('id') id: string,

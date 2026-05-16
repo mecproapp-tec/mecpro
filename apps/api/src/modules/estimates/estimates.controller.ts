@@ -13,10 +13,13 @@ import {
   BadRequestException,
   UnauthorizedException,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { EstimatesService } from './estimates.service';
+import { EstimatesPdfService } from './estimates-pdf.service';
 import { CreateEstimateDto } from './dto/create-estimate.dto';
 import { UpdateEstimateDto } from './dto/update-estimate.dto';
 
@@ -30,7 +33,10 @@ interface UserPayload {
 @UseGuards(JwtAuthGuard)
 @Controller('estimates')
 export class EstimatesController {
-  constructor(private readonly estimatesService: EstimatesService) {}
+  constructor(
+    private readonly estimatesService: EstimatesService,
+    private readonly pdfService: EstimatesPdfService,
+  ) {}
 
   @Get()
   async findAll(
@@ -47,6 +53,18 @@ export class EstimatesController {
   async findOne(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     if (!user?.tenantId) throw new BadRequestException('TenantId não encontrado');
     return this.estimatesService.findOne(Number(id), user.tenantId);
+  }
+
+  @Get(':id/pdf')
+  async downloadPdf(@Param('id') id: string, @CurrentUser() user: UserPayload, @Res() res: Response) {
+    if (!user?.tenantId) throw new BadRequestException('TenantId não encontrado');
+    const estimate = await this.estimatesService.findOne(Number(id), user.tenantId);
+    if (!estimate) throw new BadRequestException('Orçamento não encontrado');
+    const pdfBuffer = await this.pdfService.generateEstimatePdf(estimate);
+    const filename = `orcamento-${estimate.id}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(pdfBuffer);
   }
 
   @Get(':id/share')

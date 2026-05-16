@@ -219,30 +219,17 @@ export default function DetalhesCliente() {
 
   const handlePDF = async (item: Estimate | Invoice, type: "estimate" | "invoice") => {
     try {
-      const response = await api.get("/tenants/me");
-      const oficina = response.data?.data || {};
-      const win = window.open("", "_blank");
-      if (!win) return;
-      const totalComIss = type === "invoice" && "items" in item ? calculateTotalWithIss(item.items) : Number(item.total);
-      win.document.write(`<html><head><title>${type === "estimate" ? "Orçamento" : "Fatura"} ${item.id}</title>
-        <style>body{font-family:Arial;padding:20px}.header{display:flex;align-items:center;gap:20px;margin-bottom:30px;border-bottom:2px solid #00e5ff;padding-bottom:20px}
-        .logo{max-width:100px;max-height:80px}.info{flex:1}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}
-        th{background:#f2f2f2}.valor{text-align:right}.total-row{font-weight:700;background:#f9f9f9}.total-geral{font-size:1.2rem;font-weight:700;margin-top:20px;text-align:right}</style>
-        </head><body><div class="header">${oficina.logoUrl ? `<img src="${oficina.logoUrl}" class="logo" />` : ""}
-        <div class="info"><h2>${oficina.nome || "Oficina"}</h2><p>${oficina.documentType || ""} ${oficina.documentNumber || ""}</p>
-        <p>${oficina.address || ""}</p><p>Tel: ${oficina.phone || ""} | Email: ${oficina.email || ""}</p></div></div>
-        <h1>${type === "estimate" ? "Orçamento" : "Fatura"}</h1><p><strong>Cliente:</strong> ${cliente?.name}</p>
-        <p><strong>Data:</strong> ${new Date(item.date || (item as any).createdAt).toLocaleDateString()}</p>
-        <p><strong>Status:</strong> ${getStatusLabel(item.status, type)}</p>
-        <div class="details"><h3>Itens</h3><table><thead><tr><th>Descrição</th><th class="valor">Qtd</th><th class="valor">Preço</th><th class="valor">ISS</th><th class="valor">Total</th></tr></thead>
-        <tbody>${(item.items || []).map((i: any) => { const price = Number(i.price); const qty = i.quantity || 1; const subtotal = price * qty; const iss = (Number(i.issPercent) || 0) * subtotal / 100; const totalItem = subtotal + iss; return `<tr><td style="text-align:left">${i.description}</td><td class="valor">${qty}</td><td class="valor">${price.toFixed(2)}</td><td class="valor">${i.issPercent ? i.issPercent + '%' : '-'}</td><td class="valor">${totalItem.toFixed(2)}</td>`; }).join("")}</tbody>
-        <tfoot><tr class="total-row"><td colspan="4" class="valor"><strong>Total</strong></td><td class="valor"><strong>${totalComIss.toFixed(2)}</strong></td></tr></tfoot>
-        </div>
-        <div class="total-geral"><strong>Total: R$ ${totalComIss.toFixed(2)}</strong></div></body></html>`);
-      win.document.close();
-      win.print();
+      const endpoint = type === "estimate" ? `/estimates/${item.id}/pdf` : `/invoices/${item.id}/pdf`;
+      const response = await api.get(endpoint, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error("Erro ao gerar PDF. Tente novamente.");
+      console.error('Erro ao gerar PDF:', error);
+      toast.error('Erro ao gerar PDF. Tente novamente.');
     }
   };
 
