@@ -66,7 +66,7 @@ export class EstimatesService {
           tenantId,
           clientId,
           total,
-          status: 'DRAFT',
+          status: EstimateStatus.DRAFT,
           date: estimateDate,
           items: { create: items },
         },
@@ -186,7 +186,7 @@ export class EstimatesService {
     const where = {
       tenantId,
       deletedAt: null,
-      status: { not: 'CONVERTED' }, // 🔥 oculta orçamentos convertidos
+      status: { not: EstimateStatus.CONVERTED }, // ✅ agora com enum
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -209,7 +209,7 @@ export class EstimatesService {
     };
   }
 
-  // ✅ HISTÓRICO DE CONVERTIDOS (apenas leitura, lista com fatura anexada)
+  // ✅ HISTÓRICO DE CONVERTIDOS (apenas leitura)
   async findConverted(tenantId: string, page = 1, limit = 50) {
     if (!tenantId) throw new BadRequestException('TenantId inválido');
 
@@ -220,7 +220,7 @@ export class EstimatesService {
     const where = {
       tenantId,
       deletedAt: null,
-      status: 'CONVERTED',
+      status: EstimateStatus.CONVERTED, // ✅ agora com enum
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -231,7 +231,7 @@ export class EstimatesService {
         include: {
           client: true,
           items: true,
-          invoice: true, // traz a fatura gerada
+          invoice: true,
         },
         orderBy: { updatedAt: 'desc' },
       }),
@@ -262,8 +262,7 @@ export class EstimatesService {
     const estimate = await this.findOne(id, tenantId);
     if (!estimate) throw new NotFoundException('Orçamento não encontrado');
 
-    // Impedir edição de orçamentos já convertidos
-    if (estimate.status === 'CONVERTED') {
+    if (estimate.status === EstimateStatus.CONVERTED) {
       throw new BadRequestException('Orçamento convertido não pode ser alterado');
     }
 
@@ -311,7 +310,7 @@ export class EstimatesService {
     });
   }
 
-  // ✅ CONVERSÃO (já existente, com lock e sequência – mantido)
+  // ✅ CONVERSÃO (com enum e tratamento correto)
   async convertToInvoice(estimateId: number, tenantId: string) {
     let retries = 0;
     const maxRetries = 3;
@@ -331,11 +330,11 @@ export class EstimatesService {
             throw new NotFoundException('Orçamento não encontrado');
           }
 
-          if (estimate.status === 'CONVERTED') {
+          if (estimate.status === EstimateStatus.CONVERTED) {
             throw new ConflictException('Orçamento já foi convertido');
           }
 
-          if (estimate.status !== 'DRAFT' && estimate.status !== 'APPROVED') {
+          if (estimate.status !== EstimateStatus.DRAFT && estimate.status !== EstimateStatus.APPROVED) {
             throw new BadRequestException('Status inválido para conversão. Apenas rascunho ou aprovado podem ser convertidos.');
           }
 
@@ -375,7 +374,7 @@ export class EstimatesService {
 
           await tx.estimate.update({
             where: { id: estimateId },
-            data: { status: 'CONVERTED' },
+            data: { status: EstimateStatus.CONVERTED },
           });
 
           this.logger.log(`✅ Orçamento ${estimateId} convertido para fatura ${invoice.number}`);
@@ -396,7 +395,6 @@ export class EstimatesService {
     throw new InternalServerErrorException('Erro na conversão após múltiplas tentativas');
   }
 
-  // ✅ SOFT DELETE (permite excluir até convertidos, mas respeita tenant)
   async remove(id: number, tenantId: string) {
     const estimate = await this.findOne(id, tenantId);
     if (estimate.pdfKey) {
