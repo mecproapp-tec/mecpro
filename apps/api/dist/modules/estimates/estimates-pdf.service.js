@@ -38,6 +38,9 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
 var EstimatesPdfService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EstimatesPdfService = void 0;
@@ -46,17 +49,18 @@ const Handlebars = __importStar(require("handlebars"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const puppeteer = __importStar(require("puppeteer"));
+const storage_service_1 = require("../storage/storage.service");
 let EstimatesPdfService = EstimatesPdfService_1 = class EstimatesPdfService {
-    constructor() {
+    constructor(storageService) {
+        this.storageService = storageService;
         this.logger = new common_1.Logger(EstimatesPdfService_1.name);
         this.templateCache = null;
     }
     async getBrowser() {
-        const chromePath = process.env.CHROME_PATH ||
-            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+        const chromePath = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
         try {
             if (fs.existsSync(chromePath)) {
-                this.logger.log(`✅ Usando Chrome: ${chromePath}`);
+                this.logger.log(`Usando Chrome: ${chromePath}`);
                 return await puppeteer.launch({
                     executablePath: chromePath,
                     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -65,14 +69,14 @@ let EstimatesPdfService = EstimatesPdfService_1 = class EstimatesPdfService {
             }
             const altPath = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
             if (fs.existsSync(altPath)) {
-                this.logger.log(`✅ Usando Chrome alternativo`);
+                this.logger.log(`Usando Chrome alternativo`);
                 return await puppeteer.launch({
                     executablePath: altPath,
                     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
                     headless: true,
                 });
             }
-            this.logger.warn('⚠️ Chrome não encontrado, usando Chromium padrão');
+            this.logger.warn('Chrome não encontrado, usando Chromium padrão');
             return await puppeteer.launch({
                 args: ['--no-sandbox', '--disable-setuid-sandbox'],
                 headless: true,
@@ -92,24 +96,22 @@ let EstimatesPdfService = EstimatesPdfService_1 = class EstimatesPdfService {
         ];
         for (const p of possiblePaths) {
             if (fs.existsSync(p)) {
-                this.logger.log(`📄 Template encontrado em: ${p}`);
+                this.logger.log(`Template encontrado em: ${p}`);
                 const html = fs.readFileSync(p, 'utf-8');
                 this.templateCache = Handlebars.compile(html);
                 return this.templateCache;
             }
         }
-        this.logger.error('❌ Template não encontrado');
+        this.logger.error('Template não encontrado');
         throw new common_1.InternalServerErrorException('Template de orçamento não encontrado');
     }
     async generateEstimatePdf(estimate) {
         let browser = null;
         try {
-            if (!estimate) {
+            if (!estimate)
                 throw new common_1.InternalServerErrorException('Dados inválidos para PDF');
-            }
             const template = this.loadTemplate();
-            let subtotal = 0;
-            let totalIss = 0;
+            let subtotal = 0, totalIss = 0;
             const items = (estimate.items || []).map((item) => {
                 const quantity = Number(item.quantity) || 1;
                 const price = Number(item.price) || 0;
@@ -152,39 +154,35 @@ let EstimatesPdfService = EstimatesPdfService_1 = class EstimatesPdfService {
                 issueDate: new Date().toLocaleDateString('pt-BR'),
                 validUntil: new Date(Date.now() + 30 * 86400000).toLocaleDateString('pt-BR'),
             });
-            this.logger.log(`🧾 Gerando PDF orçamento ${estimate.id}`);
+            this.logger.log(`Gerando PDF orçamento ${estimate.id}`);
             browser = await this.getBrowser();
             const page = await browser.newPage();
-            await page.setContent(html, {
-                waitUntil: 'networkidle0',
-                timeout: 30000,
-            });
+            await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
             const pdf = await page.pdf({
                 format: 'A4',
                 printBackground: true,
-                margin: {
-                    top: '20px',
-                    bottom: '20px',
-                    left: '20px',
-                    right: '20px',
-                },
+                margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
             });
-            this.logger.log(`✅ PDF gerado (${pdf.length} bytes)`);
-            return Buffer.from(pdf);
+            const pdfBuffer = Buffer.from(pdf);
+            const tenantId = estimate.tenant?.id || estimate.tenantId || 'unknown';
+            const key = `tenants/${tenantId}/estimates/estimate_${estimate.id}.pdf`;
+            await this.storageService.uploadPdf(pdfBuffer, key, tenantId);
+            this.logger.log(`PDF salvo no R2: ${key}`);
+            return pdfBuffer;
         }
         catch (error) {
-            this.logger.error(`❌ Erro ao gerar PDF orçamento ${estimate?.id}: ${error.message}`, error.stack);
+            this.logger.error(`Erro ao gerar PDF orçamento ${estimate?.id}: ${error.message}`, error.stack);
             throw new common_1.InternalServerErrorException(`Erro ao gerar PDF: ${error.message}`);
         }
         finally {
-            if (browser) {
+            if (browser)
                 await browser.close();
-            }
         }
     }
 };
 exports.EstimatesPdfService = EstimatesPdfService;
 exports.EstimatesPdfService = EstimatesPdfService = EstimatesPdfService_1 = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [storage_service_1.StorageService])
 ], EstimatesPdfService);
 //# sourceMappingURL=estimates-pdf.service.js.map

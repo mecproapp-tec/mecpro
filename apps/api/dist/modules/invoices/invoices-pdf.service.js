@@ -38,6 +38,9 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
 var InvoicesPdfService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InvoicesPdfService = void 0;
@@ -46,15 +49,17 @@ const Handlebars = __importStar(require("handlebars"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const puppeteer = __importStar(require("puppeteer"));
+const storage_service_1 = require("../storage/storage.service");
 let InvoicesPdfService = InvoicesPdfService_1 = class InvoicesPdfService {
-    constructor() {
+    constructor(storageService) {
+        this.storageService = storageService;
         this.logger = new common_1.Logger(InvoicesPdfService_1.name);
         this.templateCache = null;
     }
     async getBrowser() {
         const chromePath = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
         if (fs.existsSync(chromePath)) {
-            this.logger.log(`✅ Usando Chrome: ${chromePath}`);
+            this.logger.log(`Usando Chrome: ${chromePath}`);
             return puppeteer.launch({
                 executablePath: chromePath,
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -63,7 +68,7 @@ let InvoicesPdfService = InvoicesPdfService_1 = class InvoicesPdfService {
         }
         const altPath = 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
         if (fs.existsSync(altPath)) {
-            this.logger.log(`✅ Usando Chrome alternativo: ${altPath}`);
+            this.logger.log(`Usando Chrome alternativo: ${altPath}`);
             return puppeteer.launch({
                 executablePath: altPath,
                 args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -79,13 +84,13 @@ let InvoicesPdfService = InvoicesPdfService_1 = class InvoicesPdfService {
     loadTemplate() {
         if (this.templateCache)
             return this.templateCache;
-        let templatePath = null;
         const possiblePaths = [
             path.join(__dirname, 'templates', 'invoice-pdf.hbs'),
             path.join(__dirname, 'invoice-pdf.hbs'),
             path.join(process.cwd(), 'dist', 'modules', 'invoices', 'templates', 'invoice-pdf.hbs'),
             path.join(process.cwd(), 'src', 'modules', 'invoices', 'templates', 'invoice-pdf.hbs'),
         ];
+        let templatePath = null;
         for (const tryPath of possiblePaths) {
             if (fs.existsSync(tryPath)) {
                 templatePath = tryPath;
@@ -93,24 +98,21 @@ let InvoicesPdfService = InvoicesPdfService_1 = class InvoicesPdfService {
                 break;
             }
         }
-        if (!templatePath) {
-            throw new Error(`Template não encontrado`);
-        }
+        if (!templatePath)
+            throw new Error('Template não encontrado');
         const templateHtml = fs.readFileSync(templatePath, 'utf-8');
         this.templateCache = Handlebars.compile(templateHtml);
         return this.templateCache;
     }
     async generateInvoicePdf(invoice) {
-        if (!invoice) {
+        if (!invoice)
             throw new common_1.InternalServerErrorException('Dados inválidos para gerar PDF');
-        }
         let browser = null;
         try {
             const compiledTemplate = this.loadTemplate();
             const client = invoice.client || {};
             const tenant = invoice.tenant || {};
-            let subtotal = 0;
-            let totalIss = 0;
+            let subtotal = 0, totalIss = 0;
             const items = (invoice.items || []).map((item) => {
                 const quantity = Number(item.quantity) || 1;
                 const price = Number(item.price) || 0;
@@ -157,36 +159,32 @@ let InvoicesPdfService = InvoicesPdfService_1 = class InvoicesPdfService {
             this.logger.log(`Gerando PDF para fatura ${invoice.id} (${items.length} itens)`);
             browser = await this.getBrowser();
             const page = await browser.newPage();
-            await page.setContent(html, {
-                waitUntil: 'networkidle0',
-                timeout: 30000,
-            });
+            await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
             const pdf = await page.pdf({
                 format: 'A4',
                 printBackground: true,
-                margin: {
-                    top: '20px',
-                    bottom: '20px',
-                    left: '20px',
-                    right: '20px',
-                },
+                margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
             });
-            this.logger.log(`PDF gerado com sucesso: ${pdf.length} bytes`);
-            return Buffer.from(pdf);
+            const pdfBuffer = Buffer.from(pdf);
+            const tenantId = invoice.tenant?.id || invoice.tenantId || 'unknown';
+            const key = `tenants/${tenantId}/invoices/invoice_${invoice.number || invoice.id}.pdf`;
+            await this.storageService.uploadPdf(pdfBuffer, key, tenantId);
+            this.logger.log(`PDF salvo no R2: ${key}`);
+            return pdfBuffer;
         }
         catch (error) {
             this.logger.error(`Erro ao gerar PDF para fatura ${invoice.id}`, error);
             throw new common_1.InternalServerErrorException(`Erro ao gerar PDF: ${error.message}`);
         }
         finally {
-            if (browser) {
+            if (browser)
                 await browser.close();
-            }
         }
     }
 };
 exports.InvoicesPdfService = InvoicesPdfService;
 exports.InvoicesPdfService = InvoicesPdfService = InvoicesPdfService_1 = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [storage_service_1.StorageService])
 ], InvoicesPdfService);
 //# sourceMappingURL=invoices-pdf.service.js.map

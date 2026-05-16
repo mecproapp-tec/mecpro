@@ -1,4 +1,6 @@
+import { Response } from 'express';
 import { EstimatesService } from './estimates.service';
+import { EstimatesPdfService } from './estimates-pdf.service';
 import { CreateEstimateDto } from './dto/create-estimate.dto';
 import { UpdateEstimateDto } from './dto/update-estimate.dto';
 interface UserPayload {
@@ -9,7 +11,8 @@ interface UserPayload {
 }
 export declare class EstimatesController {
     private readonly estimatesService;
-    constructor(estimatesService: EstimatesService);
+    private readonly pdfService;
+    constructor(estimatesService: EstimatesService, pdfService: EstimatesPdfService);
     findAll(user: UserPayload, page?: string, limit?: string): Promise<{
         data: ({
             client: {
@@ -26,6 +29,72 @@ export declare class EstimatesController {
                 plate: string;
                 document: string | null;
                 deletedAt: Date | null;
+            };
+            items: {
+                id: number;
+                price: import("@prisma/client/runtime/library").Decimal;
+                total: import("@prisma/client/runtime/library").Decimal;
+                description: string;
+                quantity: number;
+                issPercent: number | null;
+                estimateId: number;
+            }[];
+        } & {
+            id: number;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.EstimateStatus;
+            tenantId: string;
+            deletedAt: Date | null;
+            total: import("@prisma/client/runtime/library").Decimal;
+            pdfUrl: string | null;
+            clientId: number;
+            date: Date;
+            shareToken: string | null;
+            shareTokenExpires: Date | null;
+            pdfGeneratedAt: Date | null;
+            pdfStatus: string | null;
+            pdfKey: string | null;
+        })[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    }>;
+    findConverted(user: UserPayload, page?: string, limit?: string): Promise<{
+        data: ({
+            client: {
+                phone: string;
+                address: string | null;
+                id: number;
+                createdAt: Date;
+                updatedAt: Date;
+                status: import(".prisma/client").$Enums.ClientStatus;
+                tenantId: string;
+                name: string;
+                userId: number | null;
+                vehicle: string;
+                plate: string;
+                document: string | null;
+                deletedAt: Date | null;
+            };
+            invoice: {
+                number: string;
+                id: number;
+                createdAt: Date;
+                updatedAt: Date;
+                status: import(".prisma/client").$Enums.InvoiceStatus;
+                tenantId: string;
+                deletedAt: Date | null;
+                total: import("@prisma/client/runtime/library").Decimal;
+                pdfUrl: string | null;
+                clientId: number;
+                shareToken: string | null;
+                shareTokenExpires: Date | null;
+                pdfGeneratedAt: Date | null;
+                pdfStatus: string | null;
+                pdfKey: string | null;
+                estimateId: number | null;
             };
             items: {
                 id: number;
@@ -95,6 +164,24 @@ export declare class EstimatesController {
             document: string | null;
             deletedAt: Date | null;
         };
+        invoice: {
+            number: string;
+            id: number;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.InvoiceStatus;
+            tenantId: string;
+            deletedAt: Date | null;
+            total: import("@prisma/client/runtime/library").Decimal;
+            pdfUrl: string | null;
+            clientId: number;
+            shareToken: string | null;
+            shareTokenExpires: Date | null;
+            pdfGeneratedAt: Date | null;
+            pdfStatus: string | null;
+            pdfKey: string | null;
+            estimateId: number | null;
+        };
         items: {
             id: number;
             price: import("@prisma/client/runtime/library").Decimal;
@@ -121,6 +208,7 @@ export declare class EstimatesController {
         pdfStatus: string | null;
         pdfKey: string | null;
     }>;
+    downloadPdf(id: string, user: UserPayload, res: Response): Promise<void>;
     getShareLink(id: string, user: UserPayload): Promise<{
         shareUrl: string;
     }>;

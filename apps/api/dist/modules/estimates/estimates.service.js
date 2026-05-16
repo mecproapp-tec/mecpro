@@ -67,7 +67,7 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
                     tenantId,
                     clientId,
                     total,
-                    status: 'DRAFT',
+                    status: client_1.EstimateStatus.DRAFT,
                     date: estimateDate,
                     items: { create: items },
                 },
@@ -170,22 +170,60 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
         const safePage = Math.max(1, Number(page) || 1);
         const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
         const skip = (safePage - 1) * safeLimit;
+        const where = {
+            tenantId,
+            deletedAt: null,
+            status: { not: client_1.EstimateStatus.CONVERTED },
+        };
         const [data, total] = await this.prisma.$transaction([
             this.prisma.estimate.findMany({
-                where: { tenantId, deletedAt: null },
+                where,
                 skip,
                 take: safeLimit,
                 include: { client: true, items: true },
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prisma.estimate.count({ where: { tenantId, deletedAt: null } }),
+            this.prisma.estimate.count({ where }),
         ]);
         return {
             data,
             total,
             page: safePage,
             limit: safeLimit,
-            totalPages: Math.ceil(total / safeLimit)
+            totalPages: Math.ceil(total / safeLimit),
+        };
+    }
+    async findConverted(tenantId, page = 1, limit = 50) {
+        if (!tenantId)
+            throw new common_1.BadRequestException('TenantId inválido');
+        const safePage = Math.max(1, Number(page) || 1);
+        const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+        const skip = (safePage - 1) * safeLimit;
+        const where = {
+            tenantId,
+            deletedAt: null,
+            status: client_1.EstimateStatus.CONVERTED,
+        };
+        const [data, total] = await this.prisma.$transaction([
+            this.prisma.estimate.findMany({
+                where,
+                skip,
+                take: safeLimit,
+                include: {
+                    client: true,
+                    items: true,
+                    invoice: true,
+                },
+                orderBy: { updatedAt: 'desc' },
+            }),
+            this.prisma.estimate.count({ where }),
+        ]);
+        return {
+            data,
+            total,
+            page: safePage,
+            limit: safeLimit,
+            totalPages: Math.ceil(total / safeLimit),
         };
     }
     async findOne(id, tenantId) {
@@ -193,7 +231,7 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
             throw new common_1.BadRequestException('TenantId inválido');
         const estimate = await this.prisma.estimate.findFirst({
             where: { id, tenantId, deletedAt: null },
-            include: { client: true, items: true, tenant: true },
+            include: { client: true, items: true, tenant: true, invoice: true },
         });
         if (!estimate)
             throw new common_1.NotFoundException('Orçamento não encontrado');
@@ -203,6 +241,9 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
         const estimate = await this.findOne(id, tenantId);
         if (!estimate)
             throw new common_1.NotFoundException('Orçamento não encontrado');
+        if (estimate.status === client_1.EstimateStatus.CONVERTED) {
+            throw new common_1.BadRequestException('Orçamento convertido não pode ser alterado');
+        }
         const { clientId, items: inputItems, date, status } = data;
         return await this.prisma.$transaction(async (tx) => {
             const updateData = {};
@@ -254,14 +295,13 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
             FOR UPDATE
           `;
                     const estimate = lockedEstimate[0];
-                    if (!estimate) {
+                    if (!estimate)
                         throw new common_1.NotFoundException('Orçamento não encontrado');
+                    if (estimate.status === client_1.EstimateStatus.CONVERTED) {
+                        throw new common_1.ConflictException('Orçamento já foi convertido');
                     }
-                    if (estimate.status === 'CONVERTED') {
-                        throw new common_1.BadRequestException('Orçamento já foi convertido');
-                    }
-                    if (estimate.status !== 'DRAFT') {
-                        throw new common_1.BadRequestException('Status inválido para conversão');
+                    if (estimate.status !== client_1.EstimateStatus.DRAFT && estimate.status !== client_1.EstimateStatus.APPROVED) {
+                        throw new common_1.BadRequestException('Status inválido para conversão. Apenas rascunho ou aprovado podem ser convertidos.');
                     }
                     const items = await tx.estimateItem.findMany({
                         where: { estimateId: estimate.id },
@@ -269,8 +309,7 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
                     try {
                         await tx.$executeRaw `CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 100000 INCREMENT 1`;
                     }
-                    catch (e) {
-                    }
+                    catch (e) { }
                     const seqResult = await tx.$queryRaw `
             SELECT nextval('invoice_number_seq') as nextval
           `;
@@ -297,7 +336,7 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
                     });
                     await tx.estimate.update({
                         where: { id: estimateId },
-                        data: { status: 'CONVERTED' },
+                        data: { status: client_1.EstimateStatus.CONVERTED },
                     });
                     this.logger.log(`✅ Orçamento ${estimateId} convertido para fatura ${invoice.number}`);
                     return invoice;
@@ -361,8 +400,7 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
         if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 11) {
             throw new common_1.BadRequestException('Número de telefone inválido. Deve ter 10 ou 11 dígitos.');
         }
-        const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` :
-            cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+        const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` : cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
         const message = `📄 *ORÇAMENTO MECPRO #${estimate.id}*\n👤 *Cliente:* ${estimate.client?.name || '-'}\n🚗 *Veículo:* ${estimate.client?.vehicle || '-'}\n💰 *Total:* R$ ${Number(estimate.total).toFixed(2)}\n🔗 *Link:* ${shareUrl}\n${estimate.tenant?.name || 'MecPro'} - Sua oficina de confiança`;
         const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
         this.logger.log(`📱 Link do WhatsApp gerado para ${finalPhone}`);

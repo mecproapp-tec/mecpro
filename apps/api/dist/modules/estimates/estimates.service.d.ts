@@ -123,6 +123,72 @@ export declare class EstimatesService {
         limit: number;
         totalPages: number;
     }>;
+    findConverted(tenantId: string, page?: number, limit?: number): Promise<{
+        data: ({
+            client: {
+                phone: string;
+                address: string | null;
+                id: number;
+                createdAt: Date;
+                updatedAt: Date;
+                status: import(".prisma/client").$Enums.ClientStatus;
+                tenantId: string;
+                name: string;
+                userId: number | null;
+                vehicle: string;
+                plate: string;
+                document: string | null;
+                deletedAt: Date | null;
+            };
+            invoice: {
+                number: string;
+                id: number;
+                createdAt: Date;
+                updatedAt: Date;
+                status: import(".prisma/client").$Enums.InvoiceStatus;
+                tenantId: string;
+                deletedAt: Date | null;
+                total: Prisma.Decimal;
+                pdfUrl: string | null;
+                clientId: number;
+                shareToken: string | null;
+                shareTokenExpires: Date | null;
+                pdfGeneratedAt: Date | null;
+                pdfStatus: string | null;
+                pdfKey: string | null;
+                estimateId: number | null;
+            };
+            items: {
+                id: number;
+                price: Prisma.Decimal;
+                total: Prisma.Decimal;
+                description: string;
+                quantity: number;
+                issPercent: number | null;
+                estimateId: number;
+            }[];
+        } & {
+            id: number;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.EstimateStatus;
+            tenantId: string;
+            deletedAt: Date | null;
+            total: Prisma.Decimal;
+            pdfUrl: string | null;
+            clientId: number;
+            date: Date;
+            shareToken: string | null;
+            shareTokenExpires: Date | null;
+            pdfGeneratedAt: Date | null;
+            pdfStatus: string | null;
+            pdfKey: string | null;
+        })[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    }>;
     findOne(id: number, tenantId: string): Promise<{
         tenant: {
             number: string | null;
@@ -159,6 +225,24 @@ export declare class EstimatesService {
             plate: string;
             document: string | null;
             deletedAt: Date | null;
+        };
+        invoice: {
+            number: string;
+            id: number;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.InvoiceStatus;
+            tenantId: string;
+            deletedAt: Date | null;
+            total: Prisma.Decimal;
+            pdfUrl: string | null;
+            clientId: number;
+            shareToken: string | null;
+            shareTokenExpires: Date | null;
+            pdfGeneratedAt: Date | null;
+            pdfStatus: string | null;
+            pdfKey: string | null;
+            estimateId: number | null;
         };
         items: {
             id: number;

@@ -17,11 +17,13 @@ const common_1 = require("@nestjs/common");
 const jwt_auth_guard_1 = require("../../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../auth/decorators/current-user.decorator");
 const invoices_service_1 = require("./invoices.service");
+const invoices_pdf_service_1 = require("./invoices-pdf.service");
 const create_invoice_dto_1 = require("./dto/create-invoice.dto");
 const update_invoice_dto_1 = require("./dto/update-invoice.dto");
 let InvoicesController = class InvoicesController {
-    constructor(invoicesService) {
+    constructor(invoicesService, pdfService) {
         this.invoicesService = invoicesService;
+        this.pdfService = pdfService;
     }
     async findAll(user, page = '1', limit = '50') {
         if (!user)
@@ -34,6 +36,18 @@ let InvoicesController = class InvoicesController {
         if (!user?.tenantId)
             throw new common_1.BadRequestException('TenantId não encontrado');
         return this.invoicesService.findOne(Number(id), user.tenantId);
+    }
+    async downloadPdf(id, user, res) {
+        if (!user?.tenantId)
+            throw new common_1.BadRequestException('TenantId não encontrado');
+        const invoice = await this.invoicesService.findOne(Number(id), user.tenantId);
+        if (!invoice)
+            throw new common_1.BadRequestException('Fatura não encontrada');
+        const pdfBuffer = await this.pdfService.generateInvoicePdf(invoice);
+        const filename = `fatura-${invoice.number}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        res.send(pdfBuffer);
     }
     async getShareLink(id, user) {
         if (!user?.tenantId)
@@ -102,6 +116,15 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], InvoicesController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Get)(':id/pdf'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], InvoicesController.prototype, "downloadPdf", null);
 __decorate([
     (0, common_1.Get)(':id/share'),
     __param(0, (0, common_1.Param)('id')),
@@ -176,6 +199,7 @@ __decorate([
 exports.InvoicesController = InvoicesController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('invoices'),
-    __metadata("design:paramtypes", [invoices_service_1.InvoicesService])
+    __metadata("design:paramtypes", [invoices_service_1.InvoicesService,
+        invoices_pdf_service_1.InvoicesPdfService])
 ], InvoicesController);
 //# sourceMappingURL=invoices.controller.js.map

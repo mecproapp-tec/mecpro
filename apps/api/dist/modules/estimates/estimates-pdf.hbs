@@ -28,7 +28,6 @@
   .header h1 {
     font-size: 28px;
     margin-bottom: 8px;
-    letter-spacing: -0.5px;
   }
   .body {
     padding: 30px;
@@ -40,9 +39,8 @@
     border-bottom: 2px solid #e0e0e0;
   }
   .company-info h2 {
-    color: #000000;  /* ← Nome da oficina em preto */
+    color: #000000;
     margin-bottom: 5px;
-    font-size: 22px;
   }
   .company-info p {
     color: #666;
@@ -64,20 +62,15 @@
     border-radius: 20px;
     font-size: 14px;
     margin-bottom: 15px;
-    letter-spacing: 0.5px;
   }
   .client-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
-  .client-item {
-    font-size: 14px;
-  }
   .client-item strong {
-    color: #333;
-    display: inline-block;
     min-width: 80px;
+    display: inline-block;
   }
   .dates {
     background: #0a0a0a;
@@ -99,12 +92,11 @@
   th {
     background: #0a0a0a;
     color: #00e5ff;
-    padding: 12px;
+    padding: 14px 12px;
     text-align: left;
-    font-weight: 600;
   }
   td {
-    padding: 12px;
+    padding: 16px 12px;
     border-bottom: 1px solid #e0e0e0;
   }
   .text-right { text-align: right; }
@@ -116,7 +108,7 @@
     padding-top: 20px;
   }
   .totals p {
-    margin: 5px 0;
+    margin: 8px 0;
     font-size: 14px;
   }
   .total-geral {
@@ -127,7 +119,7 @@
     display: inline-block;
     padding: 8px 24px;
     border-radius: 40px;
-    margin-top: 10px;
+    margin-top: 15px;
   }
   .footer {
     background: #f8f9fa;
@@ -150,7 +142,6 @@
   <div class="header">
     <h1>ORÇAMENTO Nº {{estimateNumber}}</h1>
   </div>
-  
   <div class="body">
     <div class="company-info">
       {{#if companyLogo}}<img src="{{companyLogo}}" class="logo" alt="Logo">{{/if}}
@@ -159,7 +150,6 @@
       <p>{{companyEmail}}</p>
       <p>{{companyAddress}}</p>
     </div>
-    
     <div class="client-box">
       <h3>DADOS DO CLIENTE</h3>
       <div class="client-grid">
@@ -171,12 +161,10 @@
         <div class="client-item"><strong>Endereço:</strong> {{client.address}}</div>
       </div>
     </div>
-    
     <div class="dates">
       <span>Emissão: {{issueDate}}</span>
       <span>Validade: {{validUntil}}</span>
     </div>
-    
     <table>
       <thead>
         <tr>
@@ -201,14 +189,12 @@
         {{/each}}
       </tbody>
     </table>
-    
     <div class="totals">
       <p>Subtotal (sem ISS): R$ {{subtotal}}</p>
       <p>Total de ISS: R$ {{totalIss}}</p>
       <div class="total-geral">TOTAL GERAL: R$ {{total}}</div>
     </div>
   </div>
-  
   <div class="footer">
     <p>{{companyName}} - {{companyPhone}} | {{companyEmail}}</p>
     <p>Este documento é um orçamento oficial. Em caso de dúvidas, entre em contato.</p>

@@ -1,4 +1,6 @@
+import { Response } from 'express';
 import { InvoicesService } from './invoices.service';
+import { InvoicesPdfService } from './invoices-pdf.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 interface UserPayload {
@@ -9,7 +11,8 @@ interface UserPayload {
 }
 export declare class InvoicesController {
     private readonly invoicesService;
-    constructor(invoicesService: InvoicesService);
+    private readonly pdfService;
+    constructor(invoicesService: InvoicesService, pdfService: InvoicesPdfService);
     findAll(user: UserPayload, page?: string, limit?: string): Promise<{
         data: ({
             client: {
@@ -123,6 +126,7 @@ export declare class InvoicesController {
         pdfKey: string | null;
         estimateId: number | null;
     }>;
+    downloadPdf(id: string, user: UserPayload, res: Response): Promise<void>;
     getShareLink(id: string, user: UserPayload): Promise<{
         shareUrl: string;
     }>;
