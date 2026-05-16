@@ -38,17 +38,12 @@ export class PublicShareService {
     return share;
   }
 
-  // 🔥 BUG #3 CORRIGIDO: Adicionado filtro de tenantId nas consultas
   async getPublicData(token: string) {
     const share = await this.findByToken(token);
 
     if (share.type === 'ESTIMATE') {
-      // ✅ CORREÇÃO: Usar findFirst com tenantId para garantir isolamento
       const estimate = await this.prisma.estimate.findFirst({
-        where: { 
-          id: share.resourceId,
-          tenantId: share.tenantId  // 🔥 Filtro de tenant adicionado
-        },
+        where: { id: share.resourceId, tenantId: share.tenantId },
         include: { client: true, items: true, tenant: true },
       });
       if (!estimate) throw new NotFoundException('Orçamento não encontrado');
@@ -86,12 +81,8 @@ export class PublicShareService {
     }
 
     if (share.type === 'INVOICE') {
-      // ✅ CORREÇÃO: Usar findFirst com tenantId para garantir isolamento
       const invoice = await this.prisma.invoice.findFirst({
-        where: { 
-          id: share.resourceId,
-          tenantId: share.tenantId  // 🔥 Filtro de tenant adicionado
-        },
+        where: { id: share.resourceId, tenantId: share.tenantId },
         include: { client: true, items: true, tenant: true },
       });
       if (!invoice) throw new NotFoundException('Fatura não encontrada');
@@ -132,11 +123,8 @@ export class PublicShareService {
     throw new BadRequestException('Tipo de compartilhamento inválido');
   }
 
-  // 🔥 MELHORIA: Regenerate agora revoga o token antigo (cria novo, deleta antigo)
   async regenerate(token: string) {
     const share = await this.findByToken(token);
-    
-    // Criar novo token
     const newToken = randomBytes(32).toString('hex');
     const newShare = await this.prisma.publicShare.create({
       data: {
@@ -147,10 +135,7 @@ export class PublicShareService {
         expiresAt: new Date(Date.now() + 7 * 86400000),
       },
     });
-    
-    // Deletar o token antigo (revogar)
     await this.prisma.publicShare.delete({ where: { id: share.id } });
-    
     return newShare;
   }
 

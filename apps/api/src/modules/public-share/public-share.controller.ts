@@ -1,8 +1,10 @@
 import { Controller, Get, Param, Res, HttpStatus } from '@nestjs/common';
 import { PublicShareService } from './public-share.service';
+import { Public } from '../../auth/public.decorator';
 import { Response } from 'express';
 
 @Controller('public')
+@Public() // 🔓 Torna todas as rotas deste controller acessíveis sem autenticação
 export class PublicShareController {
   constructor(private readonly service: PublicShareService) {}
 
@@ -11,10 +13,8 @@ export class PublicShareController {
     try {
       const data = await this.service.getPublicData(token);
       if (data.pdfUrl) {
-        // Redireciona para o PDF (R2 ou local)
         return res.redirect(HttpStatus.FOUND, data.pdfUrl);
       }
-      // Fallback: retorna os dados em JSON se não houver PDF
       return res.status(HttpStatus.OK).json({ success: true, data });
     } catch (error) {
       return res.status(HttpStatus.NOT_FOUND).json({
