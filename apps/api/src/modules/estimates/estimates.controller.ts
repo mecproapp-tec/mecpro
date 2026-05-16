@@ -38,6 +38,7 @@ export class EstimatesController {
     private readonly pdfService: EstimatesPdfService,
   ) {}
 
+  // Listagem principal (oculta orçamentos convertidos)
   @Get()
   async findAll(
     @CurrentUser() user: UserPayload,
@@ -47,6 +48,18 @@ export class EstimatesController {
     if (!user) throw new UnauthorizedException('Usuário não autenticado');
     if (!user.tenantId) throw new BadRequestException('TenantId não encontrado');
     return this.estimatesService.findAll(user.tenantId, parseInt(page), parseInt(limit));
+  }
+
+  // Histórico de orçamentos convertidos (apenas leitura, pode excluir)
+  @Get('converted')
+  async findConverted(
+    @CurrentUser() user: UserPayload,
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+  ) {
+    if (!user) throw new UnauthorizedException('Usuário não autenticado');
+    if (!user.tenantId) throw new BadRequestException('TenantId não encontrado');
+    return this.estimatesService.findConverted(user.tenantId, parseInt(page), parseInt(limit));
   }
 
   @Get(':id')

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getAppointmentById, type Appointment } from '../../../services/appointments';
 import { FiArrowLeft, FiClock, FiCalendar, FiFileText, FiUser } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 const VerAgendamento: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,17 @@ const VerAgendamento: React.FC = () => {
 
   const handleBack = () => {
     navigate('/clientes');
+  };
+
+  const handleWhatsApp = () => {
+    const phone = appointment?.client?.phone;
+    if (!phone) {
+      toast.error('Cliente não possui telefone cadastrado.');
+      return;
+    }
+    const cleanPhone = phone.replace(/\D/g, '');
+    const whatsappUrl = `https://wa.me/55${cleanPhone}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   if (isLoading) {
@@ -94,6 +106,12 @@ const VerAgendamento: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <div style={styles.actions}>
+            <button onClick={handleWhatsApp} style={styles.whatsappButton}>
+              💬 Enviar WhatsApp
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -167,6 +185,24 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '18px',
     fontWeight: '500',
     color: '#fff',
+  },
+  actions: {
+    marginTop: '16px',
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  whatsappButton: {
+    background: '#25D366',
+    border: 'none',
+    color: '#fff',
+    padding: '12px 24px',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   loadingContainer: {
     background: 'linear-gradient(145deg, #0a0a0a 0%, #000000 100%)',

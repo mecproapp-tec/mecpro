@@ -4,11 +4,12 @@ import {
   BadRequestException,
   Logger,
   InternalServerErrorException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { EstimatesPdfService } from './estimates-pdf.service';
 import { StorageService } from '../storage/storage.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, EstimateStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -25,7 +26,6 @@ export class EstimatesService {
   private calculate(items: any[]) {
     let total = new Prisma.Decimal(0);
     const normalized = items.map((item) => {
-      // 🔥 Garantir que price seja número ou string conversível
       const priceValue = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
       const price = new Prisma.Decimal(isNaN(priceValue) ? 0 : priceValue);
       const quantity = new Prisma.Decimal(item.quantity || 1);
@@ -84,7 +84,7 @@ export class EstimatesService {
 
   private async generatePdfNow(estimate: any) {
     const estimateId = estimate.id;
-    
+
     if (this.pdfGeneratingLocks.has(estimateId)) {
       this.logger.log(`⏳ PDF para orçamento ${estimateId} já está sendo gerado. Aguardando...`);
       let attempts = 0;
@@ -99,28 +99,28 @@ export class EstimatesService {
         return { pdfUrl: updatedEstimate.pdfUrl, pdfKey: updatedEstimate.pdfKey };
       }
     }
-    
+
     this.pdfGeneratingLocks.add(estimateId);
-    
+
     try {
       const tenant = await this.prisma.tenant.findUnique({
         where: { id: estimate.tenantId },
       });
-      
+
       const fullEstimate = await this.prisma.estimate.findUnique({
         where: { id: estimate.id },
         include: { client: true, items: true },
       });
-      
+
       const estimateWithUpdatedTenant = {
         ...fullEstimate,
         tenant: tenant,
       };
-      
+
       const pdfBuffer = await this.estimatesPdfService.generateEstimatePdf(estimateWithUpdatedTenant);
       const pdfKey = `${estimate.tenantId}/estimates/${estimate.id}.pdf`;
       const pdfUrl = await this.storageService.uploadPdf(pdfBuffer, pdfKey);
-      
+
       await this.prisma.estimate.update({
         where: { id: estimate.id },
         data: {
@@ -160,7 +160,7 @@ export class EstimatesService {
     });
 
     const oldTenant = estimate.tenant;
-    const tenantChanged = 
+    const tenantChanged =
       oldTenant?.name !== currentTenant?.name ||
       oldTenant?.address !== currentTenant?.address ||
       oldTenant?.phone !== currentTenant?.phone ||
@@ -175,30 +175,75 @@ export class EstimatesService {
     return { pdfUrl: estimate.pdfUrl, pdfKey: estimate.pdfKey };
   }
 
+  // ✅ LISTAGEM PRINCIPAL (oculta convertidos)
   async findAll(tenantId: string, page = 1, limit = 50) {
     if (!tenantId) throw new BadRequestException('TenantId inválido');
-    
+
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
     const skip = (safePage - 1) * safeLimit;
 
+    const where = {
+      tenantId,
+      deletedAt: null,
+      status: { not: 'CONVERTED' }, // 🔥 oculta orçamentos convertidos
+    };
+
     const [data, total] = await this.prisma.$transaction([
       this.prisma.estimate.findMany({
-        where: { tenantId, deletedAt: null },
+        where,
         skip,
         take: safeLimit,
         include: { client: true, items: true },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.estimate.count({ where: { tenantId, deletedAt: null } }),
+      this.prisma.estimate.count({ where }),
     ]);
 
-    return { 
-      data, 
-      total, 
-      page: safePage, 
-      limit: safeLimit, 
-      totalPages: Math.ceil(total / safeLimit) 
+    return {
+      data,
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
+    };
+  }
+
+  // ✅ HISTÓRICO DE CONVERTIDOS (apenas leitura, lista com fatura anexada)
+  async findConverted(tenantId: string, page = 1, limit = 50) {
+    if (!tenantId) throw new BadRequestException('TenantId inválido');
+
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+    const skip = (safePage - 1) * safeLimit;
+
+    const where = {
+      tenantId,
+      deletedAt: null,
+      status: 'CONVERTED',
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.estimate.findMany({
+        where,
+        skip,
+        take: safeLimit,
+        include: {
+          client: true,
+          items: true,
+          invoice: true, // traz a fatura gerada
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.estimate.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
     };
   }
 
@@ -206,18 +251,24 @@ export class EstimatesService {
     if (!tenantId) throw new BadRequestException('TenantId inválido');
     const estimate = await this.prisma.estimate.findFirst({
       where: { id, tenantId, deletedAt: null },
-      include: { client: true, items: true, tenant: true },
+      include: { client: true, items: true, tenant: true, invoice: true },
     });
     if (!estimate) throw new NotFoundException('Orçamento não encontrado');
     return estimate;
   }
 
+  // ✅ UPDATE com bloqueio de orçamentos convertidos
   async update(id: number, tenantId: string, data: any) {
     const estimate = await this.findOne(id, tenantId);
     if (!estimate) throw new NotFoundException('Orçamento não encontrado');
 
+    // Impedir edição de orçamentos já convertidos
+    if (estimate.status === 'CONVERTED') {
+      throw new BadRequestException('Orçamento convertido não pode ser alterado');
+    }
+
     const { clientId, items: inputItems, date, status } = data;
-    
+
     return await this.prisma.$transaction(async (tx) => {
       const updateData: any = {};
 
@@ -235,7 +286,6 @@ export class EstimatesService {
       let itemsChanged = false;
       if (inputItems && inputItems.length > 0) {
         const { items, total } = this.calculate(inputItems);
-        // 🔥 CORREÇÃO FINAL: deleteMany apenas com estimateId (sem tenantId)
         await tx.estimateItem.deleteMany({ where: { estimateId: id } });
         updateData.items = { create: items };
         updateData.total = total;
@@ -261,10 +311,11 @@ export class EstimatesService {
     });
   }
 
+  // ✅ CONVERSÃO (já existente, com lock e sequência – mantido)
   async convertToInvoice(estimateId: number, tenantId: string) {
     let retries = 0;
     const maxRetries = 3;
-    
+
     while (retries < maxRetries) {
       try {
         return await this.prisma.$transaction(async (tx) => {
@@ -273,36 +324,34 @@ export class EstimatesService {
             WHERE id = ${estimateId} AND "tenantId" = ${tenantId}
             FOR UPDATE
           `;
-          
+
           const estimate = (lockedEstimate as any[])[0];
-          
+
           if (!estimate) {
             throw new NotFoundException('Orçamento não encontrado');
           }
-          
+
           if (estimate.status === 'CONVERTED') {
-            throw new BadRequestException('Orçamento já foi convertido');
+            throw new ConflictException('Orçamento já foi convertido');
           }
-          
-          if (estimate.status !== 'DRAFT') {
-            throw new BadRequestException('Status inválido para conversão');
+
+          if (estimate.status !== 'DRAFT' && estimate.status !== 'APPROVED') {
+            throw new BadRequestException('Status inválido para conversão. Apenas rascunho ou aprovado podem ser convertidos.');
           }
-          
+
           const items = await tx.estimateItem.findMany({
             where: { estimateId: estimate.id },
           });
-          
+
           try {
             await tx.$executeRaw`CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 100000 INCREMENT 1`;
-          } catch (e) {
-            // Sequence já existe
-          }
-          
-          const seqResult = await tx.$queryRaw<[{nextval: bigint}]>`
+          } catch (e) { }
+
+          const seqResult = await tx.$queryRaw<[{ nextval: bigint }]>`
             SELECT nextval('invoice_number_seq') as nextval
           `;
           const invoiceNumber = `FAT-${seqResult[0].nextval}`;
-          
+
           const invoice = await tx.invoice.create({
             data: {
               tenantId: estimate.tenantId,
@@ -323,12 +372,12 @@ export class EstimatesService {
             },
             include: { items: true, client: true },
           });
-          
+
           await tx.estimate.update({
             where: { id: estimateId },
             data: { status: 'CONVERTED' },
           });
-          
+
           this.logger.log(`✅ Orçamento ${estimateId} convertido para fatura ${invoice.number}`);
           return invoice;
         });
@@ -343,14 +392,15 @@ export class EstimatesService {
         throw error;
       }
     }
-    
+
     throw new InternalServerErrorException('Erro na conversão após múltiplas tentativas');
   }
 
+  // ✅ SOFT DELETE (permite excluir até convertidos, mas respeita tenant)
   async remove(id: number, tenantId: string) {
     const estimate = await this.findOne(id, tenantId);
     if (estimate.pdfKey) {
-      await this.storageService.deleteFile(estimate.pdfKey).catch(() => {});
+      await this.storageService.deleteFile(estimate.pdfKey).catch(() => { });
     }
     await this.prisma.estimate.update({
       where: { id },
@@ -394,19 +444,19 @@ export class EstimatesService {
     const { shareUrl } = await this.generateShareLink(id, tenantId);
 
     const cleanPhone = phoneNumber.replace(/\D/g, '');
-    
+
     if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 11) {
       throw new BadRequestException('Número de telefone inválido. Deve ter 10 ou 11 dígitos.');
     }
-    
-    const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` : 
-                       cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    
+
+    const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` :
+      cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
     const message = `📄 *ORÇAMENTO MECPRO #${estimate.id}*\n👤 *Cliente:* ${estimate.client?.name || '-'}\n🚗 *Veículo:* ${estimate.client?.vehicle || '-'}\n💰 *Total:* R$ ${Number(estimate.total).toFixed(2)}\n🔗 *Link:* ${shareUrl}\n${estimate.tenant?.name || 'MecPro'} - Sua oficina de confiança`;
     const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
-    
+
     this.logger.log(`📱 Link do WhatsApp gerado para ${finalPhone}`);
-    
+
     return { success: true, whatsappUrl, phoneNumber: finalPhone };
   }
 
