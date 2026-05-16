@@ -4,45 +4,42 @@ import { Injectable, Logger } from '@nestjs/common';
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
 
-  private formatPhone(phoneNumber: string): string {
-    return phoneNumber.replace(/\D/g, '');
+  private formatPhoneNumber(phone: string): string {
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.startsWith('55') && cleaned.length === 13) return cleaned;
+    if (cleaned.length === 11) return `55${cleaned}`;
+    if (cleaned.length === 10) return `55${cleaned}`;
+    return cleaned;
   }
 
   generateWhatsAppLink(phoneNumber: string, message: string): string {
-    const cleanPhone = this.formatPhone(phoneNumber);
+    const cleanPhone = this.formatPhoneNumber(phoneNumber);
     const encodedMessage = encodeURIComponent(message);
-    return `https://wa.me/55${cleanPhone}?text=${encodedMessage}`;
+    return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
   }
 
-  async sendInvoice(invoice: any, shareUrl: string) {
-    const message = `📄 *FATURA MECPRO #${invoice.number}*
-👤 *Cliente:* ${invoice.client?.name || '-'}
-🚗 *Veículo:* ${invoice.client?.vehicle || '-'}
-💰 *Total:* R$ ${Number(invoice.total).toFixed(2)}
-🔗 *Link:* ${shareUrl}
+  generateEstimateMessage(estimate: any, shareUrl: string): string {
+    return `📄 *ORÇAMENTO MECPRO #${estimate.id}*
+👤 Cliente: ${estimate.client.name}
+🚗 Veículo: ${estimate.client.vehicle || '-'}
+💰 Total: R$ ${Number(estimate.total).toFixed(2)}
+🔗 Link: ${shareUrl}
 
 MecPro - Gestão para Oficinas`;
-
-    const link = this.generateWhatsAppLink(invoice.client.phone, message);
-
-    this.logger.log(`📲 Fatura enviada ${invoice.id}`);
-
-    return { success: true, whatsappUrl: link, message };
   }
 
-  async sendEstimate(estimate: any, shareUrl: string) {
-    const message = `📄 *ORÇAMENTO MECPRO #${estimate.id}*
-👤 *Cliente:* ${estimate.client?.name || '-'}
-🚗 *Veículo:* ${estimate.client?.vehicle || '-'}
-💰 *Total:* R$ ${Number(estimate.total).toFixed(2)}
-🔗 *Link:* ${shareUrl}
+  generateInvoiceMessage(invoice: any, shareUrl: string): string {
+    return `📄 *FATURA MECPRO #${invoice.number}*
+👤 Cliente: ${invoice.client.name}
+🚗 Veículo: ${invoice.client.vehicle || '-'}
+💰 Total: R$ ${Number(invoice.total).toFixed(2)}
+🔗 Link: ${shareUrl}
 
 MecPro - Sua oficina de confiança`;
+  }
 
-    const link = this.generateWhatsAppLink(estimate.client.phone, message);
-
-    this.logger.log(`📲 Orçamento enviado ${estimate.id}`);
-
-    return { success: true, whatsappUrl: link, message };
+  getShareLink(shareToken: string, type: 'estimate' | 'invoice'): string {
+    const baseUrl = process.env.APP_URL || 'https://api.mecpro.tec.br';
+    return `${baseUrl}/api/public/${type}s/share/${shareToken}`;
   }
 }

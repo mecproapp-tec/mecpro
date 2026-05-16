@@ -40,6 +40,7 @@ model Tenant {
   scheduledNotifications     ScheduledNotification[]
   subscriptions              Subscription[]
   users                      User[]
+  whatsappLogs               WhatsappLog[]
 
   @@index([status])
   @@index([email])
@@ -58,7 +59,7 @@ model User {
   id            Int            @id @default(autoincrement())
   status        UserStatus     @default(ACTIVE)
   tokenVersion  Int            @default(0)
-  paymentStatus String?        @default("pending")   // ← NOVO CAMPO
+  paymentStatus String?        @default("pending")
   clients       Client[]
   refreshTokens RefreshToken[]
   tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -345,6 +346,25 @@ model ContactMessage {
 
   @@index([tenantId, status])
   @@index([createdAt])
+}
+
+model WhatsappLog {
+  id           String    @id @default(uuid())
+  tenantId     String
+  type         String // estimate, invoice
+  resourceId   Int
+  phone        String
+  status       String // SENT, FAILED, DELIVERED, READ
+  messageId    String?
+  errorMessage String?
+  sentAt       DateTime  @default(now())
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([sentAt])
 }
 
 model Budget {
