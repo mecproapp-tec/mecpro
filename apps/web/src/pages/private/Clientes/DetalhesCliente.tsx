@@ -262,7 +262,7 @@ export default function DetalhesCliente() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0a0a] to-black py-10 px-6 text-gray-200 font-sans">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => navigate("/clientes")}
@@ -344,23 +344,36 @@ export default function DetalhesCliente() {
             </div>
           ) : (
             <div className="bg-[#0f0f0f] rounded-xl border border-[#00e5ff]/20 overflow-x-auto">
-              <table className="w-full border-collapse min-w-[500px]">
+              <table className="w-full table-fixed border-collapse min-w-[760px]">
                 <thead>
                   <tr className="bg-[#111] border-b border-[#00e5ff]/20">
-                    <th className="text-left px-4 py-3 text-[#00e5ff] text-sm font-semibold">Data</th>
-                    <th className="text-right px-4 py-3 text-[#00e5ff] text-sm font-semibold">Total</th>
-                    <th className="text-left px-4 py-3 text-[#00e5ff] text-sm font-semibold">Status</th>
-                    <th className="text-center px-4 py-3 text-[#00e5ff] text-sm font-semibold">Ações</th>
+                    <th className="w-[25%] text-left px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Data
+                    </th>
+                    <th className="w-[20%] text-right px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Total
+                    </th>
+                    <th className="w-[25%] text-center px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Status
+                    </th>
+                    <th className="w-[30%] text-center px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Ações
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {orcamentos.map(orc => (
-                    <tr key={orc.id} className="border-b border-[#00e5ff]/10 hover:bg-[#ffffff05]">
-                      <td className="text-left px-4 py-3 text-sm">{new Date(orc.date).toLocaleDateString()}</td>
-                      <td className="text-right px-4 py-3 text-sm font-medium text-[#00e5ff]">
+                    <tr
+                      key={orc.id}
+                      className="border-b border-[#00e5ff]/10 hover:bg-[#ffffff05] transition-colors"
+                    >
+                      <td className="px-6 py-5 text-sm whitespace-nowrap">
+                        {new Date(orc.date).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-5 text-sm font-semibold text-[#00e5ff] text-right whitespace-nowrap">
                         R$ {Number(orc.total).toFixed(2)}
                       </td>
-                      <td className="text-left px-4 py-3 text-sm">
+                      <td className="px-6 py-5 text-center">
                         <span
                           className="inline-block px-3 py-1 rounded-full text-xs font-semibold"
                           style={{
@@ -371,8 +384,8 @@ export default function DetalhesCliente() {
                           {getStatusLabel(orc.status, "estimate")}
                         </span>
                       </td>
-                      <td className="text-center px-4 py-3">
-                        <div className="flex justify-center gap-2">
+                      <td className="px-6 py-5">
+                        <div className="flex items-center justify-center gap-3">
                           <button
                             onClick={() => handlePDF(orc, "estimate")}
                             className="bg-[#111] border border-[#00e5ff]/20 w-8 h-8 rounded-lg flex items-center justify-center text-[#00e5ff] hover:bg-[#1a1a1a] transition-colors"
@@ -414,27 +427,44 @@ export default function DetalhesCliente() {
             </div>
           ) : (
             <div className="bg-[#0f0f0f] rounded-xl border border-[#00e5ff]/20 overflow-x-auto">
-              <table className="w-full border-collapse min-w-[600px]">
+              <table className="w-full table-fixed border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-[#111] border-b border-[#00e5ff]/20">
-                    <th className="text-left px-4 py-3 text-[#00e5ff] text-sm font-semibold">Número</th>
-                    <th className="text-left px-4 py-3 text-[#00e5ff] text-sm font-semibold">Data</th>
-                    <th className="text-right px-4 py-3 text-[#00e5ff] text-sm font-semibold">Total</th>
-                    <th className="text-left px-4 py-3 text-[#00e5ff] text-sm font-semibold">Status</th>
-                    <th className="text-center px-4 py-3 text-[#00e5ff] text-sm font-semibold">Ações</th>
+                    <th className="w-[30%] text-left px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Número
+                    </th>
+                    <th className="w-[20%] text-left px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Data
+                    </th>
+                    <th className="w-[15%] text-right px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Total
+                    </th>
+                    <th className="w-[20%] text-center px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Status
+                    </th>
+                    <th className="w-[15%] text-center px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Ações
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {faturas.map(fat => {
                     const totalComIss = calculateTotalWithIss(fat.items);
                     return (
-                      <tr key={fat.id} className="border-b border-[#00e5ff]/10 hover:bg-[#ffffff05]">
-                        <td className="text-left px-4 py-3 text-sm">{fat.number}</td>
-                        <td className="text-left px-4 py-3 text-sm">{new Date(fat.createdAt).toLocaleDateString()}</td>
-                        <td className="text-right px-4 py-3 text-sm font-medium text-[#00e5ff]">
+                      <tr
+                        key={fat.id}
+                        className="border-b border-[#00e5ff]/10 hover:bg-[#ffffff05] transition-colors"
+                      >
+                        <td className="px-6 py-5 text-sm whitespace-nowrap">
+                          {fat.number}
+                        </td>
+                        <td className="px-6 py-5 text-sm whitespace-nowrap">
+                          {new Date(fat.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-5 text-sm font-semibold text-[#00e5ff] text-right whitespace-nowrap">
                           R$ {totalComIss.toFixed(2)}
                         </td>
-                        <td className="text-left px-4 py-3 text-sm">
+                        <td className="px-6 py-5 text-center">
                           <span
                             className="inline-block px-3 py-1 rounded-full text-xs font-semibold"
                             style={{
@@ -445,8 +475,8 @@ export default function DetalhesCliente() {
                             {getStatusLabel(fat.status, "invoice")}
                           </span>
                         </td>
-                        <td className="text-center px-4 py-3">
-                          <div className="flex justify-center gap-2">
+                        <td className="px-6 py-5">
+                          <div className="flex items-center justify-center gap-3">
                             <button
                               onClick={() => handlePDF(fat, "invoice")}
                               className="bg-[#111] border border-[#00e5ff]/20 w-8 h-8 rounded-lg flex items-center justify-center text-[#00e5ff] hover:bg-[#1a1a1a] transition-colors"
@@ -489,21 +519,34 @@ export default function DetalhesCliente() {
             </div>
           ) : (
             <div className="bg-[#0f0f0f] rounded-xl border border-[#00e5ff]/20 overflow-x-auto">
-              <table className="w-full border-collapse min-w-[500px]">
+              <table className="w-full table-fixed border-collapse min-w-[760px]">
                 <thead>
                   <tr className="bg-[#111] border-b border-[#00e5ff]/20">
-                    <th className="text-left px-4 py-3 text-[#00e5ff] text-sm font-semibold">Data/Hora</th>
-                    <th className="text-left px-4 py-3 text-[#00e5ff] text-sm font-semibold">Comentário</th>
-                    <th className="text-center px-4 py-3 text-[#00e5ff] text-sm font-semibold">Ações</th>
+                    <th className="w-[30%] text-left px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Data/Hora
+                    </th>
+                    <th className="w-[50%] text-left px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Comentário
+                    </th>
+                    <th className="w-[20%] text-center px-6 py-4 text-[#00e5ff] text-sm font-semibold">
+                      Ações
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {agendamentos.map(ag => (
-                    <tr key={ag.id} className="border-b border-[#00e5ff]/10 hover:bg-[#ffffff05]">
-                      <td className="text-left px-4 py-3 text-sm">{formatarDataHoraBrasilia(ag.date)}</td>
-                      <td className="text-left px-4 py-3 text-sm">{ag.comment || "-"}</td>
-                      <td className="text-center px-4 py-3">
-                        <div className="flex justify-center gap-2">
+                    <tr
+                      key={ag.id}
+                      className="border-b border-[#00e5ff]/10 hover:bg-[#ffffff05] transition-colors"
+                    >
+                      <td className="px-6 py-5 text-sm whitespace-nowrap">
+                        {formatarDataHoraBrasilia(ag.date)}
+                      </td>
+                      <td className="px-6 py-5 text-sm break-words">
+                        {ag.comment || "-"}
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center justify-center gap-3">
                           <button
                             onClick={() => handleWhatsAppAppointment(ag)}
                             className="bg-[#111] border border-[#25D366]/40 w-8 h-8 rounded-lg flex items-center justify-center text-[#25D366] hover:bg-[#1a1a1a] transition-colors"
