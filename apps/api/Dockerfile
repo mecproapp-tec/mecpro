@@ -2,6 +2,9 @@ FROM node:20-bullseye AS builder
 
 WORKDIR /app
 
+# Invalida o cache do Docker em cada build (garante que o código mais recente seja copiado)
+RUN echo "BUILD_TIMESTAMP=$(date +%s)" > /dev/null
+
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -11,10 +14,11 @@ COPY prisma ./prisma
 RUN npm ci
 RUN npx prisma generate
 
+# Copia todo o código – a camada anterior será refeita devido ao RUN acima
 COPY . .
 RUN npm run build
 
-# Copia templates .hbs (se existirem) – sem redirecionamento no COPY
+# Copia templates .hbs
 RUN mkdir -p dist/modules/estimates dist/modules/invoices && \
     (cp src/modules/estimates/*.hbs dist/modules/estimates/ 2>/dev/null || true) && \
     (cp src/modules/invoices/*.hbs dist/modules/invoices/ 2>/dev/null || true)
