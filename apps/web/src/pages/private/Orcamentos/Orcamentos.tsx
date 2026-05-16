@@ -1,4 +1,3 @@
-// apps/web/src/pages/private/Orcamentos/Orcamentos.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -193,20 +192,17 @@ export default function Orcamentos() {
       const invoiceId = result?.invoiceId || result?.invoice?.id;
       const invoiceNumber = result?.invoiceNumber || result?.invoice?.number;
       
-      setOrcamentos(prev => prev.map(o => 
-        o.id === orcamento.id ? { ...o, status: "converted" } : o
-      ));
+      await carregarDados();
       
       if (invoiceId) {
         const verFatura = confirm(
           `✅ Orçamento #${orcamento.id} convertido em fatura #${invoiceNumber || invoiceId} com sucesso!\n\nDeseja visualizar a fatura agora?`
         );
         if (verFatura) {
-          navigate(`/faturas/${invoiceId}`);
+          navigate(`/faturas/detalhes/${invoiceId}`);
         }
       } else {
         toast.success(`✅ Orçamento #${orcamento.id} convertido em fatura com sucesso!`);
-        await carregarDados();
       }
       
     } catch (err: any) {
@@ -228,7 +224,6 @@ export default function Orcamentos() {
     }
   };
 
-  // ✅ FUNÇÃO WHATSAPP CORRIGIDA (sem adicionar "55" manualmente)
   const handleWhatsApp = async (item: Estimate, tipo: 'estimate' | 'invoice') => {
     const cliente = item.client;
     let phoneNumber = cliente?.phone;
@@ -238,13 +233,11 @@ export default function Orcamentos() {
       if (!phoneNumber) return;
     }
 
-    // Remove tudo que não é dígito e remove possível "55" no início
     let telefone = phoneNumber.replace(/\D/g, '');
     if (telefone.startsWith('55')) {
       telefone = telefone.slice(2);
     }
 
-    // Validação: 10 ou 11 dígitos
     if (telefone.length !== 10 && telefone.length !== 11) {
       toast.error('Número inválido. Use DDD + número (ex.: 21999999999)');
       return;
@@ -286,7 +279,6 @@ export default function Orcamentos() {
     }
   };
 
-  // Gerar PDF via backend (sempre atualizado)
   const handlePDF = async (orcamento: Estimate) => {
     const loadingToast = toast.loading('Gerando PDF...');
     try {
@@ -409,7 +401,7 @@ export default function Orcamentos() {
                             <option value="pending">Pendente</option>
                           </select>
                         )}
-                       </td>
+                      </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
                           <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={styles.actionButton} title="Ver cliente">
@@ -439,7 +431,7 @@ export default function Orcamentos() {
                             </>
                           )}
                         </div>
-                       </td>
+                      </td>
                     </tr>
                   );
                 })}
