@@ -175,7 +175,7 @@ export class EstimatesService {
     return { pdfUrl: estimate.pdfUrl, pdfKey: estimate.pdfKey };
   }
 
-  // ✅ LISTAGEM PRINCIPAL (oculta convertidos)
+  // Listagem principal (oculta convertidos)
   async findAll(tenantId: string, page = 1, limit = 50) {
     if (!tenantId) throw new BadRequestException('TenantId inválido');
 
@@ -186,7 +186,7 @@ export class EstimatesService {
     const where = {
       tenantId,
       deletedAt: null,
-      status: { not: EstimateStatus.CONVERTED }, // ✅ agora com enum
+      status: { not: EstimateStatus.CONVERTED },
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -209,7 +209,7 @@ export class EstimatesService {
     };
   }
 
-  // ✅ HISTÓRICO DE CONVERTIDOS (apenas leitura)
+  // Histórico de orçamentos convertidos
   async findConverted(tenantId: string, page = 1, limit = 50) {
     if (!tenantId) throw new BadRequestException('TenantId inválido');
 
@@ -220,7 +220,7 @@ export class EstimatesService {
     const where = {
       tenantId,
       deletedAt: null,
-      status: EstimateStatus.CONVERTED, // ✅ agora com enum
+      status: EstimateStatus.CONVERTED,
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -257,7 +257,6 @@ export class EstimatesService {
     return estimate;
   }
 
-  // ✅ UPDATE com bloqueio de orçamentos convertidos
   async update(id: number, tenantId: string, data: any) {
     const estimate = await this.findOne(id, tenantId);
     if (!estimate) throw new NotFoundException('Orçamento não encontrado');
@@ -310,7 +309,6 @@ export class EstimatesService {
     });
   }
 
-  // ✅ CONVERSÃO (com enum e tratamento correto)
   async convertToInvoice(estimateId: number, tenantId: string) {
     let retries = 0;
     const maxRetries = 3;
@@ -323,28 +321,23 @@ export class EstimatesService {
             WHERE id = ${estimateId} AND "tenantId" = ${tenantId}
             FOR UPDATE
           `;
-
           const estimate = (lockedEstimate as any[])[0];
-
-          if (!estimate) {
-            throw new NotFoundException('Orçamento não encontrado');
-          }
-
+          if (!estimate) throw new NotFoundException('Orçamento não encontrado');
           if (estimate.status === EstimateStatus.CONVERTED) {
             throw new ConflictException('Orçamento já foi convertido');
           }
-
           if (estimate.status !== EstimateStatus.DRAFT && estimate.status !== EstimateStatus.APPROVED) {
             throw new BadRequestException('Status inválido para conversão. Apenas rascunho ou aprovado podem ser convertidos.');
           }
 
+          // Buscar itens do orçamento (sem tenantId, pois não existe no modelo)
           const items = await tx.estimateItem.findMany({
             where: { estimateId: estimate.id },
           });
 
           try {
             await tx.$executeRaw`CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 100000 INCREMENT 1`;
-          } catch (e) { }
+          } catch (e) { /* sequência já existe */ }
 
           const seqResult = await tx.$queryRaw<[{ nextval: bigint }]>`
             SELECT nextval('invoice_number_seq') as nextval
@@ -391,7 +384,6 @@ export class EstimatesService {
         throw error;
       }
     }
-
     throw new InternalServerErrorException('Erro na conversão após múltiplas tentativas');
   }
 
@@ -442,19 +434,13 @@ export class EstimatesService {
     const { shareUrl } = await this.generateShareLink(id, tenantId);
 
     const cleanPhone = phoneNumber.replace(/\D/g, '');
-
     if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 11) {
       throw new BadRequestException('Número de telefone inválido. Deve ter 10 ou 11 dígitos.');
     }
-
-    const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` :
-      cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-
+    const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` : cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
     const message = `📄 *ORÇAMENTO MECPRO #${estimate.id}*\n👤 *Cliente:* ${estimate.client?.name || '-'}\n🚗 *Veículo:* ${estimate.client?.vehicle || '-'}\n💰 *Total:* R$ ${Number(estimate.total).toFixed(2)}\n🔗 *Link:* ${shareUrl}\n${estimate.tenant?.name || 'MecPro'} - Sua oficina de confiança`;
     const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
-
     this.logger.log(`📱 Link do WhatsApp gerado para ${finalPhone}`);
-
     return { success: true, whatsappUrl, phoneNumber: finalPhone };
   }
 
