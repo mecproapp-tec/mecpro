@@ -18,8 +18,11 @@ let JobsService = JobsService_1 = class JobsService {
     constructor(prisma) {
         this.prisma = prisma;
         this.logger = new common_1.Logger(JobsService_1.name);
+        this.cronEnabled = process.env.CRON_INSTANCE === 'true';
     }
     async expireTrials() {
+        if (!this.cronEnabled)
+            return;
         this.logger.log('🔄 Verificando trials expirados...');
         const expiredTenants = await this.prisma.tenant.updateMany({
             where: {
@@ -27,16 +30,15 @@ let JobsService = JobsService_1 = class JobsService {
                 trialEndsAt: { lt: new Date() },
                 status: 'ACTIVE',
             },
-            data: {
-                status: 'BLOCKED',
-                paymentStatus: 'EXPIRED',
-            },
+            data: { status: 'BLOCKED', paymentStatus: 'EXPIRED' },
         });
         if (expiredTenants.count > 0) {
             this.logger.log(`✅ ${expiredTenants.count} tenants tiveram trial expirado`);
         }
     }
     async cleanExpiredSessions() {
+        if (!this.cronEnabled)
+            return;
         this.logger.log('🔄 Limpando sessões expiradas...');
         const deleted = await this.prisma.userSession.deleteMany({
             where: {
@@ -48,11 +50,11 @@ let JobsService = JobsService_1 = class JobsService {
         }
     }
     async cleanExpiredTokens() {
+        if (!this.cronEnabled)
+            return;
         this.logger.log('🔄 Limpando refresh tokens expirados...');
         const deleted = await this.prisma.refreshToken.deleteMany({
-            where: {
-                expiresAt: { lt: new Date() },
-            },
+            where: { expiresAt: { lt: new Date() } },
         });
         if (deleted.count > 0) {
             this.logger.log(`✅ ${deleted.count} refresh tokens expirados removidos`);

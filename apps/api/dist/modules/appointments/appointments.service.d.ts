@@ -7,31 +7,32 @@ export declare class AppointmentsService {
     private notificationsService;
     private readonly logger;
     private isCronRunning;
+    private readonly cronEnabled;
     constructor(prisma: PrismaService, notificationsService: NotificationsService);
     findAll(tenantId: string, page?: number, limit?: number, startDate?: string, endDate?: string): Promise<{
         data: ({
             client: {
-                phone: string;
-                address: string | null;
-                id: number;
-                createdAt: Date;
-                updatedAt: Date;
-                status: import(".prisma/client").$Enums.ClientStatus;
-                tenantId: string;
                 name: string;
+                tenantId: string;
+                createdAt: Date;
+                id: number;
                 userId: number | null;
+                phone: string;
                 vehicle: string;
                 plate: string;
+                updatedAt: Date;
+                address: string | null;
                 document: string | null;
                 deletedAt: Date | null;
+                status: import(".prisma/client").$Enums.ClientStatus;
             };
         } & {
-            id: number;
-            createdAt: Date;
             tenantId: string;
+            createdAt: Date;
             clientId: number;
-            date: Date;
             comment: string | null;
+            date: Date;
+            id: number;
         })[];
         total: number;
         page: number;
@@ -40,83 +41,83 @@ export declare class AppointmentsService {
     }>;
     findOne(id: number, tenantId: string): Promise<{
         client: {
-            phone: string;
-            address: string | null;
-            id: number;
-            createdAt: Date;
-            updatedAt: Date;
-            status: import(".prisma/client").$Enums.ClientStatus;
-            tenantId: string;
             name: string;
+            tenantId: string;
+            createdAt: Date;
+            id: number;
             userId: number | null;
+            phone: string;
             vehicle: string;
             plate: string;
+            updatedAt: Date;
+            address: string | null;
             document: string | null;
             deletedAt: Date | null;
+            status: import(".prisma/client").$Enums.ClientStatus;
         };
     } & {
-        id: number;
-        createdAt: Date;
         tenantId: string;
+        createdAt: Date;
         clientId: number;
-        date: Date;
         comment: string | null;
+        date: Date;
+        id: number;
     }>;
     create(tenantId: string, data: CreateAppointmentDto): Promise<{
         client: {
-            phone: string;
-            address: string | null;
-            id: number;
-            createdAt: Date;
-            updatedAt: Date;
-            status: import(".prisma/client").$Enums.ClientStatus;
-            tenantId: string;
             name: string;
+            tenantId: string;
+            createdAt: Date;
+            id: number;
             userId: number | null;
+            phone: string;
             vehicle: string;
             plate: string;
+            updatedAt: Date;
+            address: string | null;
             document: string | null;
             deletedAt: Date | null;
+            status: import(".prisma/client").$Enums.ClientStatus;
         };
     } & {
-        id: number;
-        createdAt: Date;
         tenantId: string;
+        createdAt: Date;
         clientId: number;
-        date: Date;
         comment: string | null;
+        date: Date;
+        id: number;
     }>;
     update(id: number, tenantId: string, data: UpdateAppointmentDto): Promise<{
         client: {
-            phone: string;
-            address: string | null;
-            id: number;
-            createdAt: Date;
-            updatedAt: Date;
-            status: import(".prisma/client").$Enums.ClientStatus;
-            tenantId: string;
             name: string;
+            tenantId: string;
+            createdAt: Date;
+            id: number;
             userId: number | null;
+            phone: string;
             vehicle: string;
             plate: string;
+            updatedAt: Date;
+            address: string | null;
             document: string | null;
             deletedAt: Date | null;
+            status: import(".prisma/client").$Enums.ClientStatus;
         };
     } & {
-        id: number;
-        createdAt: Date;
         tenantId: string;
+        createdAt: Date;
         clientId: number;
-        date: Date;
         comment: string | null;
+        date: Date;
+        id: number;
     }>;
     remove(id: number, tenantId: string): Promise<{
-        id: number;
-        createdAt: Date;
         tenantId: string;
+        createdAt: Date;
         clientId: number;
-        date: Date;
         comment: string | null;
+        date: Date;
+        id: number;
     }>;
     checkAppointmentsForNotifications(): Promise<void>;
 }

@@ -21,6 +21,7 @@ let AppointmentsService = AppointmentsService_1 = class AppointmentsService {
         this.notificationsService = notificationsService;
         this.logger = new common_1.Logger(AppointmentsService_1.name);
         this.isCronRunning = false;
+        this.cronEnabled = process.env.CRON_INSTANCE === 'true';
     }
     async findAll(tenantId, page = 1, limit = 50, startDate, endDate) {
         const skip = (page - 1) * limit;
@@ -84,6 +85,8 @@ let AppointmentsService = AppointmentsService_1 = class AppointmentsService {
         return this.prisma.appointment.delete({ where: { id } });
     }
     async checkAppointmentsForNotifications() {
+        if (!this.cronEnabled)
+            return;
         if (this.isCronRunning) {
             this.logger.warn('⚠️ Cron job já está em execução. Ignorando nova chamada.');
             return;
@@ -93,7 +96,6 @@ let AppointmentsService = AppointmentsService_1 = class AppointmentsService {
             this.logger.log('🕒 Job de verificação de agendamentos executado às: ' + new Date().toLocaleString());
             const now = new Date();
             const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
-            this.logger.log(`Buscando agendamentos entre ${oneMinuteAgo.toISOString()} e ${now.toISOString()}`);
             const appointments = await this.prisma.appointment.findMany({
                 where: {
                     date: {
@@ -123,11 +125,7 @@ let AppointmentsService = AppointmentsService_1 = class AppointmentsService {
                     continue;
                 }
                 const title = `🔔 Horário de agendamento: ${app.client.name}`;
-                const message = `Cliente: ${app.client.name}
-Veículo: ${app.client.vehicle || 'Não informado'} - Placa: ${app.client.plate || 'Não informada'}
-Horário: ${new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-Entre em contato com o cliente.`;
-                this.logger.log(`Criando notificação para agendamento ${app.id} (cliente: ${app.client.name})`);
+                const message = `Cliente: ${app.client.name}\nVeículo: ${app.client.vehicle || 'Não informado'} - Placa: ${app.client.plate || 'Não informada'}\nHorário: ${new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\nEntre em contato com o cliente.`;
                 await this.notificationsService.createForAppointment(app.id, app.tenantId, title, message);
             }
         }
