@@ -1,26 +1,17 @@
+import { ConfigService } from '@nestjs/config';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '../shared/prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 interface UserPayload {
     id: number;
     tenantId: string;
     role: string;
     sessionToken: string;
 }
-declare class CreateSubscriptionDto {
-    email: string;
-    officeName?: string;
-    documentType?: string;
-    documentNumber?: string;
-    phone?: string;
-    cep?: string;
-    address?: string;
-    externalReference?: string;
-}
 export declare class PaymentController {
-    private paymentService;
-    private prisma;
-    private configService;
+    private readonly paymentService;
+    private readonly prisma;
+    private readonly configService;
     constructor(paymentService: PaymentService, prisma: PrismaService, configService: ConfigService);
     createSubscription(body: CreateSubscriptionDto): Promise<{
         success: boolean;

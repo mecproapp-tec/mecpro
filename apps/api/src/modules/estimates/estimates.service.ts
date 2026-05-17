@@ -456,12 +456,11 @@ export class EstimatesService {
             );
           }
 
-          const items =
-            await tx.estimateItem.findMany({
-              where: {
-                estimateId: estimate.id,
-              },
-            });
+          const items = await tx.estimateItem.findMany({
+  where: {
+    estimateId: estimate.id,
+  },
+});
 
           if (!items.length) {
             throw new BadRequestException(

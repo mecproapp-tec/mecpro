@@ -14,15 +14,14 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentController = void 0;
 const common_1 = require("@nestjs/common");
+const crypto_1 = require("crypto");
+const config_1 = require("@nestjs/config");
 const payment_service_1 = require("./payment.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const public_decorator_1 = require("../auth/public.decorator");
 const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
 const prisma_service_1 = require("../shared/prisma/prisma.service");
-const crypto_1 = require("crypto");
-const config_1 = require("@nestjs/config");
-class CreateSubscriptionDto {
-}
+const create_subscription_dto_1 = require("./dto/create-subscription.dto");
 let PaymentController = class PaymentController {
     constructor(paymentService, prisma, configService) {
         this.paymentService = paymentService;
@@ -30,13 +29,27 @@ let PaymentController = class PaymentController {
         this.configService = configService;
     }
     async createSubscription(body) {
-        console.log('\n🔵 CRIANDO ASSINATURA REAL (trial 7 dias) 🔵');
-        const { email, officeName, documentType, documentNumber, phone, cep, address, externalReference } = body;
-        if (!email)
+        console.log('\n🔵 CRIANDO ASSINATURA REAL 🔵');
+        console.log('📥 BODY RECEBIDO:', body);
+        const { email, officeName, documentType, documentNumber, phone, cep, address, externalReference, } = body;
+        if (!email?.trim()) {
             throw new common_1.BadRequestException('Email é obrigatório');
+        }
         const finalExternalRef = externalReference || (0, crypto_1.randomUUID)();
         const frontendUrl = this.configService.get('FRONTEND_URL');
+        if (!frontendUrl) {
+            throw new common_1.BadRequestException('FRONTEND_URL não configurada no backend');
+        }
         const backUrl = `${frontendUrl}/register?payment=success`;
+        const existingPending = await this.prisma.pendingSubscription.findUnique({
+            where: { email },
+        });
+        if (existingPending) {
+            console.log('⚠️ PendingSubscription antiga encontrada. Removendo...');
+            await this.prisma.pendingSubscription.delete({
+                where: { email },
+            });
+        }
         const pending = await this.prisma.pendingSubscription.create({
             data: {
                 email,
@@ -51,6 +64,7 @@ let PaymentController = class PaymentController {
                 address: address || '',
             },
         });
+        console.log('✅ PendingSubscription criada:', pending.id);
         const { checkoutLink, preapprovalId } = await this.paymentService.createSubscription({
             email,
             externalReference: finalExternalRef,
@@ -58,9 +72,11 @@ let PaymentController = class PaymentController {
         });
         await this.prisma.pendingSubscription.update({
             where: { id: pending.id },
-            data: { subscriptionId: preapprovalId },
+            data: {
+                subscriptionId: preapprovalId,
+            },
         });
-        console.log(`✅ Assinatura MP: ${preapprovalId}`);
+        console.log(`✅ Assinatura criada no MP: ${preapprovalId}`);
         return {
             success: true,
             checkoutLink,
@@ -78,7 +94,9 @@ let PaymentController = class PaymentController {
                 trialEndsAt: true,
                 subscriptionId: true,
                 subscriptions: {
-                    orderBy: { createdAt: 'desc' },
+                    orderBy: {
+                        createdAt: 'desc',
+                    },
                     take: 1,
                     select: {
                         planName: true,
@@ -106,8 +124,13 @@ let PaymentController = class PaymentController {
     }
     async cancelSubscription(user) {
         const tenant = await this.prisma.tenant.findUnique({
-            where: { id: user.tenantId },
-            select: { subscriptionId: true, id: true },
+            where: {
+                id: user.tenantId,
+            },
+            select: {
+                subscriptionId: true,
+                id: true,
+            },
         });
         if (!tenant || !tenant.subscriptionId) {
             throw new common_1.BadRequestException('Nenhuma assinatura ativa encontrada');
@@ -115,7 +138,9 @@ let PaymentController = class PaymentController {
         const cancelled = await this.paymentService.cancelSubscription(tenant.subscriptionId);
         if (cancelled) {
             await this.prisma.tenant.update({
-                where: { id: tenant.id },
+                where: {
+                    id: tenant.id,
+                },
                 data: {
                     status: 'CANCELED',
                     paymentStatus: 'CANCELED',
@@ -146,7 +171,7 @@ __decorate([
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [CreateSubscriptionDto]),
+    __metadata("design:paramtypes", [create_subscription_dto_1.CreateSubscriptionDto]),
     __metadata("design:returntype", Promise)
 ], PaymentController.prototype, "createSubscription", null);
 __decorate([
