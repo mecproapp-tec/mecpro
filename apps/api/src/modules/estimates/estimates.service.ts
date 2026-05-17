@@ -99,7 +99,7 @@ export class EstimatesService {
     const client = await this.prisma.client.findFirst({
       where: {
         id: clientId,
-        
+        tenantId,
       },
     });
 
@@ -416,6 +416,9 @@ export class EstimatesService {
     estimateId: number,
     tenantId: string,
   ) {
+    // 🔍 LOG DE DIAGNÓSTICO PARA VERIFICAR SE O CÓDIGO CORRETO ESTÁ RODANDO
+    this.logger.log(`🚀 VERSÃO CORRIGIDA - convertToInvoice chamada para estimate ${estimateId}`);
+
     try {
       return await this.prisma.$transaction(
         async (tx) => {
@@ -457,10 +460,10 @@ export class EstimatesService {
           }
 
           const items = await tx.estimateItem.findMany({
-  where: {
-    estimateId: estimate.id,
-  },
-});
+            where: {
+              estimateId: estimate.id,
+            },
+          });
 
           if (!items.length) {
             throw new BadRequestException(
@@ -560,16 +563,14 @@ export class EstimatesService {
     }
   }
 
-private async generateInvoiceNumber(
-  tx: Prisma.TransactionClient,
-  tenantId: string,
-): Promise<string> {
-  const year = new Date().getFullYear();
-
-  const timestamp = Date.now();
-
-  return `${year}-${timestamp}`;
-}
+  private async generateInvoiceNumber(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+  ): Promise<string> {
+    const year = new Date().getFullYear();
+    const timestamp = Date.now();
+    return `${year}-${timestamp}`;
+  }
 
   async remove(
     id: number,
@@ -713,32 +714,32 @@ private async generateInvoiceNumber(
         pdfUrl,
         pdfKey,
       };
- } catch (error: any) {
-  this.logger.error(
-    `Erro ao gerar PDF`,
-    error?.stack || error,
-  );
+    } catch (error: any) {
+      this.logger.error(
+        `Erro ao gerar PDF`,
+        error?.stack || error,
+      );
 
-  await this.prisma.estimate
-    .update({
-      where: {
-        id: estimate.id,
-      },
+      await this.prisma.estimate
+        .update({
+          where: {
+            id: estimate.id,
+          },
 
-      data: {
-        pdfStatus: 'failed',
-      },
-    })
-    .catch(() => null);
+          data: {
+            pdfStatus: 'failed',
+          },
+        })
+        .catch(() => null);
 
-  throw new BadRequestException(
-    'Erro ao gerar PDF',
-  );
-} finally {
-  this.pdfGeneratingLocks.delete(
-    estimateId,
-  );
-}
+      throw new BadRequestException(
+        'Erro ao gerar PDF',
+      );
+    } finally {
+      this.pdfGeneratingLocks.delete(
+        estimateId,
+      );
+    }
   }
 
   private async ensurePdf(
