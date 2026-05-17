@@ -560,54 +560,15 @@ export class EstimatesService {
     }
   }
 
-  private async generateInvoiceNumber(
-    tx: Prisma.TransactionClient,
-    tenantId: string,
-  ): Promise<string> {
-    const year =
-      new Date().getFullYear();
+private async generateInvoiceNumber(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+): Promise<string> {
+  const year = new Date().getFullYear();
 
-    const lastInvoice =
-      await tx.invoice.findFirst({
-        where: {
-          tenantId,
-
-          number: {
-            startsWith: `${year}/`,
-          },
-        },
-
-        orderBy: {
-          number: 'desc',
-        },
-
-        select: {
-          number: true,
-        },
-      });
-
-    let sequence = 1;
-
-    if (lastInvoice?.number) {
-      const parts =
-        lastInvoice.number.split('/');
-
-      if (parts.length === 2) {
-        const lastSeq = parseInt(
-          parts[1],
-          10,
-        );
-
-        if (!isNaN(lastSeq)) {
-          sequence = lastSeq + 1;
-        }
-      }
-    }
-
-    return `${year}/${sequence
-      .toString()
-      .padStart(4, '0')}`;
-  }
+  // Número único seguro para produção
+  return `${year}-${Date.now()}`;
+}
 
   async remove(
     id: number,
@@ -751,32 +712,43 @@ export class EstimatesService {
         pdfUrl,
         pdfKey,
       };
-    } catch (error: any) {
-      this.logger.error(
-        `Erro ao gerar PDF`,
-        error?.stack || error,
-      );
+ } catch (error: any) {
 
-      await this.prisma.estimate
-        .update({
-          where: {
-            id: estimate.id,
-          },
+  console.error('==============================');
+  console.error('ERRO AO CONVERTER ORÇAMENTO');
+  console.error('==============================');
 
-          data: {
-            pdfStatus: 'failed',
-          },
-        })
-        .catch(() => null);
+  console.error(error);
 
-      throw new BadRequestException(
-        'Erro ao gerar PDF',
-      );
-    } finally {
-      this.pdfGeneratingLocks.delete(
-        estimateId,
-      );
-    }
+  if (error?.code) {
+    console.error('PRISMA CODE:', error.code);
+  }
+
+  if (error?.meta) {
+    console.error(
+      'PRISMA META:',
+      JSON.stringify(error.meta, null, 2),
+    );
+  }
+
+  this.logger.error(
+    `Erro ao converter orçamento ${estimateId}`,
+    error?.stack || JSON.stringify(error, null, 2),
+  );
+
+  if (
+    error instanceof BadRequestException ||
+    error instanceof NotFoundException ||
+    error instanceof ConflictException
+  ) {
+    throw error;
+  }
+
+  throw new InternalServerErrorException(
+    error?.message ||
+      'Erro interno ao converter orçamento',
+  );
+}
   }
 
   private async ensurePdf(
