@@ -1,5 +1,8 @@
 FROM node:20-slim AS builder
 
+# Força quebra de cache - altere o valor abaixo sempre que precisar rebuild completo
+ARG CACHE_BUST=20250517
+
 # Instalar dependências de sistema para Puppeteer/Chromium
 RUN apt-get update && apt-get install -y \
     chromium \
@@ -37,17 +40,20 @@ COPY prisma ./prisma
 # Instalar dependências Node (atualiza lockfile)
 RUN npm install
 
-# Copiar código fonte
+# Copiar código fonte (aqui o cache será invalidado se o código mudar)
 COPY . .
 
 # Gerar Prisma Client
 RUN npx prisma generate
 
-# Build da aplicação NestJS (se necessário - ajuste conforme seu projeto)
+# Build da aplicação NestJS
 RUN npm run build
 
 # Segunda etapa (produção)
 FROM node:20-slim
+
+# Força quebra de cache também na etapa de produção
+ARG CACHE_BUST=20250517
 
 RUN apt-get update && apt-get install -y \
     chromium \
