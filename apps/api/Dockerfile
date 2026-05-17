@@ -1,7 +1,10 @@
+
+
+
 FROM node:20-slim AS builder
 
 # Força quebra de cache - altere o valor abaixo sempre que precisar rebuild completo
-ARG CACHE_BUST=20250517
+ARG CACHE_BUST=202605171820
 
 # Instalar dependências de sistema para Puppeteer/Chromium
 RUN apt-get update && apt-get install -y \
