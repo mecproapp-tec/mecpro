@@ -37,10 +37,7 @@ let PublicShareService = class PublicShareService {
         const share = await this.findByToken(token);
         if (share.type === 'ESTIMATE') {
             const estimate = await this.prisma.estimate.findFirst({
-                where: {
-                    id: share.resourceId,
-                    tenantId: share.tenantId
-                },
+                where: { id: share.resourceId, tenantId: share.tenantId },
                 include: { client: true, items: true, tenant: true },
             });
             if (!estimate)
@@ -78,10 +75,7 @@ let PublicShareService = class PublicShareService {
         }
         if (share.type === 'INVOICE') {
             const invoice = await this.prisma.invoice.findFirst({
-                where: {
-                    id: share.resourceId,
-                    tenantId: share.tenantId
-                },
+                where: { id: share.resourceId, tenantId: share.tenantId },
                 include: { client: true, items: true, tenant: true },
             });
             if (!invoice)

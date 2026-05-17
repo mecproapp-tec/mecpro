@@ -1,3 +1,5 @@
+import { SendEstimateWhatsappService } from './send-estimate-whatsapp.service';
+import { SendInvoiceWhatsappService } from './send-invoice-whatsapp.service';
 interface UserPayload {
     id: number;
     tenantId: string;
@@ -5,14 +7,10 @@ interface UserPayload {
     sessionToken: string;
 }
 export declare class WhatsappController {
-    generateWhatsAppLink(body: {
-        phoneNumber: string;
-        message: string;
-    }, user: UserPayload): Promise<{
-        success: boolean;
-        whatsappUrl: string;
-        message: string;
-        tenantId: string;
-    }>;
+    private sendEstimateWhatsapp;
+    private sendInvoiceWhatsapp;
+    constructor(sendEstimateWhatsapp: SendEstimateWhatsappService, sendInvoiceWhatsapp: SendInvoiceWhatsappService);
+    sendEstimateLink(id: string, user: UserPayload): Promise<any>;
+    sendInvoiceLink(id: string, user: UserPayload): Promise<any>;
 }
 export {};

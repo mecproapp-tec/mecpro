@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PublicShareController = void 0;
 const common_1 = require("@nestjs/common");
 const public_share_service_1 = require("./public-share.service");
+const public_decorator_1 = require("../../auth/public.decorator");
 let PublicShareController = class PublicShareController {
     constructor(service) {
         this.service = service;
@@ -69,6 +70,7 @@ __decorate([
 ], PublicShareController.prototype, "getInvoiceByToken", null);
 exports.PublicShareController = PublicShareController = __decorate([
     (0, common_1.Controller)('public'),
+    (0, public_decorator_1.Public)(),
     __metadata("design:paramtypes", [public_share_service_1.PublicShareService])
 ], PublicShareController);
 //# sourceMappingURL=public-share.controller.js.map

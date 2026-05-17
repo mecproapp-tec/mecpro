@@ -11,24 +11,22 @@ const common_1 = require("@nestjs/common");
 const whatsapp_service_1 = require("./whatsapp.service");
 const whatsapp_controller_1 = require("./whatsapp.controller");
 const send_estimate_whatsapp_service_1 = require("./send-estimate-whatsapp.service");
-const storage_module_1 = require("../storage/storage.module");
-const estimates_pdf_service_1 = require("../estimates/estimates-pdf.service");
-const invoices_pdf_service_1 = require("../invoices/invoices-pdf.service");
+const send_invoice_whatsapp_service_1 = require("./send-invoice-whatsapp.service");
 const prisma_module_1 = require("../../shared/prisma/prisma.module");
+const public_share_module_1 = require("../public-share/public-share.module");
 let WhatsappModule = class WhatsappModule {
 };
 exports.WhatsappModule = WhatsappModule;
 exports.WhatsappModule = WhatsappModule = __decorate([
     (0, common_1.Module)({
-        imports: [storage_module_1.StorageModule, prisma_module_1.PrismaModule],
+        imports: [prisma_module_1.PrismaModule, public_share_module_1.PublicShareModule],
         providers: [
             whatsapp_service_1.WhatsappService,
             send_estimate_whatsapp_service_1.SendEstimateWhatsappService,
-            estimates_pdf_service_1.EstimatesPdfService,
-            invoices_pdf_service_1.InvoicesPdfService,
+            send_invoice_whatsapp_service_1.SendInvoiceWhatsappService,
         ],
         controllers: [whatsapp_controller_1.WhatsappController],
-        exports: [whatsapp_service_1.WhatsappService, send_estimate_whatsapp_service_1.SendEstimateWhatsappService],
+        exports: [send_estimate_whatsapp_service_1.SendEstimateWhatsappService, send_invoice_whatsapp_service_1.SendInvoiceWhatsappService],
     })
 ], WhatsappModule);
 //# sourceMappingURL=whatsapp.module.js.map

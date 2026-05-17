@@ -81,17 +81,12 @@ let InvoicesService = InvoicesService_1 = class InvoicesService {
     }
     async generatePdfNow(invoice) {
         try {
-            const tenant = await this.prisma.tenant.findUnique({
-                where: { id: invoice.tenantId },
-            });
+            const tenant = await this.prisma.tenant.findUnique({ where: { id: invoice.tenantId } });
             const fullInvoice = await this.prisma.invoice.findUnique({
                 where: { id: invoice.id },
                 include: { client: true, items: true },
             });
-            const invoiceWithUpdatedTenant = {
-                ...fullInvoice,
-                tenant: tenant,
-            };
+            const invoiceWithUpdatedTenant = { ...fullInvoice, tenant };
             const pdfBuffer = await this.invoicesPdfService.generateInvoicePdf(invoiceWithUpdatedTenant);
             const pdfKey = `${invoice.tenantId}/invoices/${invoice.number}.pdf`;
             const pdfUrl = await this.storageService.uploadPdf(pdfBuffer, pdfKey);
@@ -104,10 +99,7 @@ let InvoicesService = InvoicesService_1 = class InvoicesService {
         }
         catch (error) {
             this.logger.error(`Erro PDF fatura ${invoice.id}: ${error.message}`);
-            await this.prisma.invoice.update({
-                where: { id: invoice.id },
-                data: { pdfStatus: 'failed' },
-            });
+            await this.prisma.invoice.update({ where: { id: invoice.id }, data: { pdfStatus: 'failed' } });
             throw new common_1.BadRequestException('Erro ao gerar PDF. Tente novamente mais tarde.');
         }
     }
@@ -121,9 +113,7 @@ let InvoicesService = InvoicesService_1 = class InvoicesService {
         if (forceRegenerate) {
             return this.generatePdfNow(invoice);
         }
-        const currentTenant = await this.prisma.tenant.findUnique({
-            where: { id: invoice.tenantId },
-        });
+        const currentTenant = await this.prisma.tenant.findUnique({ where: { id: invoice.tenantId } });
         const oldTenant = invoice.tenant;
         const tenantChanged = oldTenant?.name !== currentTenant?.name ||
             oldTenant?.address !== currentTenant?.address ||
@@ -152,13 +142,7 @@ let InvoicesService = InvoicesService_1 = class InvoicesService {
             }),
             this.prisma.invoice.count({ where: { tenantId, deletedAt: null } }),
         ]);
-        return {
-            data,
-            total,
-            page: safePage,
-            limit: safeLimit,
-            totalPages: Math.ceil(total / safeLimit)
-        };
+        return { data, total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) };
     }
     async findOne(id, tenantId) {
         const invoice = await this.prisma.invoice.findFirst({
@@ -186,10 +170,7 @@ let InvoicesService = InvoicesService_1 = class InvoicesService {
         const invoice = await this.findOne(id, tenantId);
         if (invoice.pdfKey)
             await this.storageService.deleteFile(invoice.pdfKey).catch(() => { });
-        await this.prisma.invoice.update({
-            where: { id },
-            data: { deletedAt: new Date() },
-        });
+        await this.prisma.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
         return { success: true };
     }
     async generateShareLink(invoiceId, tenantId) {
@@ -220,11 +201,10 @@ let InvoicesService = InvoicesService_1 = class InvoicesService {
         if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 11) {
             throw new common_1.BadRequestException('Número de telefone inválido. Deve ter 10 ou 11 dígitos.');
         }
-        const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` :
-            cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+        const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` : (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`);
         const message = `📄 *FATURA MECPRO #${invoice.number}*\n👤 *Cliente:* ${invoice.client?.name || '-'}\n🚗 *Veículo:* ${invoice.client?.vehicle || '-'}\n💰 *Total:* R$ ${Number(invoice.total).toFixed(2)}\n🔗 *Link:* ${shareUrl}\n${invoice.tenant?.name || 'MecPro'} - Gestão para Oficinas`;
         const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
-        this.logger.log(`📱 Link WhatsApp gerado para ${finalPhone}`);
+        this.logger.log(`📱 Link WhatsApp gerado para fatura ${invoice.number}`);
         return { success: true, whatsappUrl };
     }
     async resendPdf(id, tenantId) {

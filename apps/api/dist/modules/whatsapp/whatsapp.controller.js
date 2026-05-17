@@ -17,30 +17,43 @@ const common_1 = require("@nestjs/common");
 const jwt_auth_guard_1 = require("../../auth/guards/jwt-auth.guard");
 const session_guard_1 = require("../../auth/guards/session.guard");
 const current_user_decorator_1 = require("../../auth/decorators/current-user.decorator");
+const send_estimate_whatsapp_service_1 = require("./send-estimate-whatsapp.service");
+const send_invoice_whatsapp_service_1 = require("./send-invoice-whatsapp.service");
 let WhatsappController = class WhatsappController {
-    async generateWhatsAppLink(body, user) {
-        const cleanPhone = body.phoneNumber.replace(/\D/g, '');
-        const encodedMessage = encodeURIComponent(body.message);
-        const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodedMessage}`;
-        return {
-            success: true,
-            whatsappUrl,
-            message: 'Clique no link para enviar pelo WhatsApp',
-            tenantId: user.tenantId,
-        };
+    constructor(sendEstimateWhatsapp, sendInvoiceWhatsapp) {
+        this.sendEstimateWhatsapp = sendEstimateWhatsapp;
+        this.sendInvoiceWhatsapp = sendInvoiceWhatsapp;
+    }
+    async sendEstimateLink(id, user) {
+        const result = await this.sendEstimateWhatsapp.execute(Number(id));
+        return result;
+    }
+    async sendInvoiceLink(id, user) {
+        const result = await this.sendInvoiceWhatsapp.execute(Number(id));
+        return result;
     }
 };
 exports.WhatsappController = WhatsappController;
 __decorate([
-    (0, common_1.Post)('send-link'),
-    __param(0, (0, common_1.Body)()),
+    (0, common_1.Post)('estimate/:id'),
+    __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
-], WhatsappController.prototype, "generateWhatsAppLink", null);
+], WhatsappController.prototype, "sendEstimateLink", null);
+__decorate([
+    (0, common_1.Post)('invoice/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], WhatsappController.prototype, "sendInvoiceLink", null);
 exports.WhatsappController = WhatsappController = __decorate([
     (0, common_1.Controller)('whatsapp'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, session_guard_1.SessionGuard)
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, session_guard_1.SessionGuard),
+    __metadata("design:paramtypes", [send_estimate_whatsapp_service_1.SendEstimateWhatsappService,
+        send_invoice_whatsapp_service_1.SendInvoiceWhatsappService])
 ], WhatsappController);
 //# sourceMappingURL=whatsapp.controller.js.map

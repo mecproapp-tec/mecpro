@@ -8,61 +8,61 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var SendEstimateWhatsappService_1;
+var SendInvoiceWhatsappService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SendEstimateWhatsappService = void 0;
+exports.SendInvoiceWhatsappService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../shared/prisma/prisma.service");
 const public_share_service_1 = require("../public-share/public-share.service");
 const whatsapp_service_1 = require("./whatsapp.service");
-let SendEstimateWhatsappService = SendEstimateWhatsappService_1 = class SendEstimateWhatsappService {
+let SendInvoiceWhatsappService = SendInvoiceWhatsappService_1 = class SendInvoiceWhatsappService {
     constructor(prisma, publicShareService, whatsappService) {
         this.prisma = prisma;
         this.publicShareService = publicShareService;
         this.whatsappService = whatsappService;
-        this.logger = new common_1.Logger(SendEstimateWhatsappService_1.name);
+        this.logger = new common_1.Logger(SendInvoiceWhatsappService_1.name);
     }
-    async execute(estimateId) {
-        const estimate = await this.prisma.estimate.findUnique({
-            where: { id: estimateId },
+    async execute(invoiceId) {
+        const invoice = await this.prisma.invoice.findUnique({
+            where: { id: invoiceId },
             include: { client: true, tenant: true },
         });
-        if (!estimate)
-            throw new common_1.NotFoundException('Orçamento não encontrado');
-        if (!estimate.client?.phone)
+        if (!invoice)
+            throw new common_1.NotFoundException('Fatura não encontrada');
+        if (!invoice.client?.phone)
             throw new common_1.NotFoundException('Cliente sem telefone');
-        let shareToken = estimate.shareToken;
+        let shareToken = invoice.shareToken;
         if (!shareToken) {
             const share = await this.publicShareService.create({
-                tenantId: estimate.tenantId,
-                type: 'ESTIMATE',
-                resourceId: estimate.id,
+                tenantId: invoice.tenantId,
+                type: 'INVOICE',
+                resourceId: invoice.id,
                 expiresInDays: 30,
             });
             shareToken = share.token;
-            await this.prisma.estimate.update({
-                where: { id: estimate.id },
+            await this.prisma.invoice.update({
+                where: { id: invoice.id },
                 data: { shareToken, shareTokenExpires: share.expiresAt },
             });
         }
-        const shareUrl = this.whatsappService.getShareLink(shareToken, 'estimate');
-        const message = this.whatsappService.generateEstimateMessage(estimate, shareUrl);
-        const whatsappUrl = this.whatsappService.generateWhatsAppLink(estimate.client.phone, message);
-        this.logger.log(`Link WhatsApp gerado para orçamento ${estimate.id}: ${whatsappUrl}`);
+        const shareUrl = this.whatsappService.getShareLink(shareToken, 'invoice');
+        const message = this.whatsappService.generateInvoiceMessage(invoice, shareUrl);
+        const whatsappUrl = this.whatsappService.generateWhatsAppLink(invoice.client.phone, message);
+        this.logger.log(`Link WhatsApp gerado para fatura ${invoice.number}: ${whatsappUrl}`);
         return {
             success: true,
             whatsappUrl,
             shareUrl,
             message,
-            clientPhone: estimate.client.phone,
+            clientPhone: invoice.client.phone,
         };
     }
 };
-exports.SendEstimateWhatsappService = SendEstimateWhatsappService;
-exports.SendEstimateWhatsappService = SendEstimateWhatsappService = SendEstimateWhatsappService_1 = __decorate([
+exports.SendInvoiceWhatsappService = SendInvoiceWhatsappService;
+exports.SendInvoiceWhatsappService = SendInvoiceWhatsappService = SendInvoiceWhatsappService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         public_share_service_1.PublicShareService,
         whatsapp_service_1.WhatsappService])
-], SendEstimateWhatsappService);
-//# sourceMappingURL=send-estimate-whatsapp.service.js.map
+], SendInvoiceWhatsappService);
+//# sourceMappingURL=send-invoice-whatsapp.service.js.map
