@@ -8,11 +8,7 @@ import { PublicShareModule } from '../public-share/public-share.module';
 
 @Module({
   imports: [PrismaModule, PublicShareModule],
-  providers: [
-    WhatsappService,
-    SendEstimateWhatsappService,
-    SendInvoiceWhatsappService,
-  ],
+  providers: [WhatsappService, SendEstimateWhatsappService, SendInvoiceWhatsappService],
   controllers: [WhatsappController],
   exports: [SendEstimateWhatsappService, SendInvoiceWhatsappService],
 })

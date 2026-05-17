@@ -9,7 +9,7 @@ import {
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { EstimatesPdfService } from './estimates-pdf.service';
 import { StorageService } from '../storage/storage.service';
-import { Prisma, EstimateStatus } from '@prisma/client';
+import { Prisma, EstimateStatus, InvoiceStatus } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -235,50 +235,92 @@ export class EstimatesService {
   async convertToInvoice(estimateId: number, tenantId: string) {
     let retries = 0;
     const maxRetries = 3;
+
     while (retries < maxRetries) {
       try {
         return await this.prisma.$transaction(async (tx) => {
-          const lockedEstimate = await tx.$queryRaw`SELECT * FROM "Estimate" WHERE id = ${estimateId} AND "tenantId" = ${tenantId} FOR UPDATE`;
-          const estimate = (lockedEstimate as any[])[0];
+          const lockedEstimate = await tx.$queryRaw<Array<any>>`
+            SELECT * FROM "Estimate"
+            WHERE id = ${estimateId}
+              AND "tenantId" = ${tenantId}
+              AND "deletedAt" IS NULL
+            FOR UPDATE
+          `;
+
+          const estimate = lockedEstimate[0];
           if (!estimate) throw new NotFoundException('Orçamento não encontrado');
-          if (estimate.status === EstimateStatus.CONVERTED) throw new ConflictException('Orçamento já convertido');
-          if (estimate.status !== EstimateStatus.DRAFT && estimate.status !== EstimateStatus.APPROVED) {
-            throw new BadRequestException('Status inválido para conversão');
+
+          if (estimate.status === EstimateStatus.CONVERTED) {
+            throw new ConflictException('Orçamento já convertido');
           }
-          const items = await tx.estimateItem.findMany({ where: { estimateId: estimate.id } });
-          try {
-            await tx.$executeRaw`CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 100000 INCREMENT 1`;
-          } catch (e) {}
-          const seqResult = await tx.$queryRaw<[{ nextval: bigint }]>`SELECT nextval('invoice_number_seq') as nextval`;
-          const invoiceNumber = `FAT-${seqResult[0].nextval}`;
+
+          if (estimate.status !== EstimateStatus.DRAFT && estimate.status !== EstimateStatus.APPROVED) {
+            throw new BadRequestException('Somente orçamentos pendentes ou aprovados podem ser convertidos');
+          }
+
+          const existingInvoice = await tx.invoice.findUnique({
+            where: { estimateId: estimate.id },
+          });
+          if (existingInvoice) {
+            throw new ConflictException(`Este orçamento já foi convertido para a fatura ${existingInvoice.number}`);
+          }
+
+          const items = await tx.estimateItem.findMany({
+            where: { estimateId: estimate.id },
+          });
+
+          if (!items.length) {
+            throw new BadRequestException('Orçamento sem itens não pode ser convertido');
+          }
+
+          // Geração de número sem sequence (timestamp + random)
+          const invoiceNumber = `FAT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
           const invoice = await tx.invoice.create({
             data: {
               tenantId: estimate.tenantId,
               clientId: estimate.clientId,
               total: estimate.total,
-              status: 'PENDING',
+              status: InvoiceStatus.PENDING,
               number: invoiceNumber,
               estimateId: estimate.id,
-              items: { create: items.map((item) => ({ ...item, id: undefined })) },
+              items: {
+                create: items.map((item) => ({
+                  description: item.description,
+                  quantity: item.quantity,
+                  price: item.price,
+                  total: item.total,
+                  issPercent: item.issPercent ?? 0,
+                })),
+              },
+              pdfStatus: 'pending',
             },
-            include: { items: true, client: true },
+            include: { items: true, client: true, tenant: true },
           });
-          await tx.estimate.update({ where: { id: estimateId }, data: { status: EstimateStatus.CONVERTED } });
-          this.logger.log(`✅ Orçamento ${estimateId} convertido para ${invoice.number}`);
+
+          await tx.estimate.update({
+            where: { id: estimate.id },
+            data: { status: EstimateStatus.CONVERTED },
+          });
+
+          this.logger.log(`✅ Orçamento ${estimate.id} convertido para ${invoice.number}`);
           return invoice;
         });
       } catch (error: any) {
         if (error.code === 'P2002' && retries < maxRetries - 1) {
           retries++;
-          this.logger.warn(`⚠️ Tentativa ${retries}/${maxRetries}`);
-          await new Promise((resolve) => setTimeout(resolve, 100 * retries));
+          this.logger.warn(`⚠️ Retry ${retries}/${maxRetries} na conversão do orçamento ${estimateId}`);
+          await new Promise((resolve) => setTimeout(resolve, retries * 150));
           continue;
         }
-        this.logger.error(`❌ Erro conversão: ${error.message}`);
+        this.logger.error(`❌ Erro ao converter orçamento ${estimateId}: ${error.message}`, error.stack);
+        if (error.code === 'P2002') {
+          throw new ConflictException('Já existe uma fatura vinculada a este orçamento');
+        }
         throw error;
       }
     }
-    throw new InternalServerErrorException('Erro na conversão');
+    throw new InternalServerErrorException('Falha ao converter orçamento em fatura');
   }
 
   async remove(id: number, tenantId: string) {
