@@ -273,7 +273,6 @@ export class EstimatesService {
             throw new BadRequestException('Orçamento sem itens não pode ser convertido');
           }
 
-          // Geração de número sem sequence (timestamp + random)
           const invoiceNumber = `FAT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
           const invoice = await tx.invoice.create({
