@@ -164,6 +164,7 @@ export default function Orcamentos() {
     }
   };
 
+  // ========== FUNÇÃO handleConverter CORRIGIDA ==========
   const handleConverter = async (orcamento: Estimate) => {
     if (convertingIds.has(orcamento.id)) {
       toast.error("Este orçamento já está sendo convertido. Aguarde...");
@@ -187,7 +188,6 @@ export default function Orcamentos() {
 
     try {
       const response = await api.post(`/estimates/${orcamento.id}/convert`);
-      
       const result = response.data?.data || response.data;
       const invoiceId = result?.invoiceId || result?.invoice?.id;
       const invoiceNumber = result?.invoiceNumber || result?.invoice?.number;
@@ -195,26 +195,39 @@ export default function Orcamentos() {
       await carregarDados();
       
       if (invoiceId) {
-        const verFatura = confirm(
-          `✅ Orçamento #${orcamento.id} convertido em fatura #${invoiceNumber || invoiceId} com sucesso!\n\nDeseja visualizar a fatura agora?`
+        toast.success(
+          (t) => (
+            <span>
+              ✅ Convertido para fatura #{invoiceNumber || invoiceId}
+              <button
+                onClick={() => {
+                  toast.dismiss(t);
+                  navigate(`/faturas/detalhes/${invoiceId}`);
+                }}
+                style={{ marginLeft: "12px", background: "#00e5ff", border: "none", borderRadius: "8px", padding: "4px 12px", cursor: "pointer", color: "#000" }}
+              >
+                Ver fatura
+              </button>
+            </span>
+          ),
+          { duration: 8000 }
         );
-        if (verFatura) {
-          navigate(`/faturas/detalhes/${invoiceId}`);
-        }
       } else {
-        toast.success(`✅ Orçamento #${orcamento.id} convertido em fatura com sucesso!`);
+        toast.success(`✅ Orçamento #${orcamento.id} convertido com sucesso!`);
       }
       
     } catch (err: any) {
       console.error("❌ Erro na conversão:", err);
-      if (err.code === 'ECONNABORTED') {
-        toast.error("A conversão está demorando mais que o normal. Verifique se a fatura foi criada.");
+      let errorMsg = err.response?.data?.message || "Erro ao converter orçamento em fatura";
+      if (err.response?.status === 409) {
+        errorMsg = "Este orçamento já foi convertido ou está duplicado.";
+      } else if (err.code === "ECONNABORTED") {
+        errorMsg = "Tempo esgotado. Verifique se a fatura foi criada (pode estar processando).";
       } else if (err.response?.status === 401) {
-        toast.error("Sua sessão expirou. Recarregue a página e tente novamente.");
+        errorMsg = "Sua sessão expirou. Recarregue a página e tente novamente.";
         window.location.reload();
-      } else {
-        toast.error(err.response?.data?.message || "Erro ao converter orçamento em fatura");
       }
+      toast.error(errorMsg);
     } finally {
       setConvertingIds(prev => {
         const newSet = new Set(prev);
@@ -223,6 +236,7 @@ export default function Orcamentos() {
       });
     }
   };
+  // ========== FIM DA CORREÇÃO ==========
 
   const handleWhatsApp = async (item: Estimate, tipo: 'estimate' | 'invoice') => {
     const cliente = item.client;

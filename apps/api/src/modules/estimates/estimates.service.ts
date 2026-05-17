@@ -556,6 +556,11 @@ export class EstimatesService {
         throw error;
       }
 
+      // Tratamento específico para violação de chave única (número de fatura duplicado)
+      if (error.code === 'P2002') {
+        throw new ConflictException('Número de fatura duplicado. Tente novamente.');
+      }
+
       throw new InternalServerErrorException(
         error?.message ||
           'Erro ao converter orçamento',
@@ -563,13 +568,45 @@ export class EstimatesService {
     }
   }
 
+  // MÉTODO CORRIGIDO: Gera número de fatura sequencial por mês, evitando duplicidade
   private async generateInvoiceNumber(
     tx: Prisma.TransactionClient,
     tenantId: string,
   ): Promise<string> {
-    const year = new Date().getFullYear();
-    const timestamp = Date.now();
-    return `${year}-${timestamp}`;
+    const pad = (num: number, size: number) => String(num).padStart(size, '0');
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = pad(now.getMonth() + 1, 2);
+
+    const lastInvoice = await tx.invoice.findFirst({
+      where: {
+        tenantId,
+        number: { startsWith: `${year}-${month}` },
+        deletedAt: null,
+      },
+      orderBy: { number: 'desc' },
+      select: { number: true },
+    });
+
+    let nextSeq = 1;
+    if (lastInvoice?.number) {
+      const parts = lastInvoice.number.split('-');
+      const lastSeq = parseInt(parts[2], 10);
+      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+    }
+
+    const sequence = pad(nextSeq, 6);
+    const invoiceNumber = `${year}-${month}-${sequence}`;
+
+    // Garantia extra de unicidade (embora o startsWith + order já evite colisão)
+    const exists = await tx.invoice.findUnique({
+      where: { number: invoiceNumber },
+    });
+    if (exists) {
+      throw new ConflictException('Falha ao gerar número único da fatura. Tente novamente.');
+    }
+
+    return invoiceNumber;
   }
 
   async remove(
