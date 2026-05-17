@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { registerTenant } from "../../../services/api";
@@ -21,6 +21,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [paymentStarted, setPaymentStarted] = useState(false);
   const [preapprovalId, setPreapprovalId] = useState<string | null>(null);
+
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -106,14 +108,24 @@ export default function Register() {
   };
 
   const handlePayment = async () => {
-    if (!form.email) {
+    // Captura o valor REAL do campo de e-mail (DOM)
+    const currentEmail = emailInputRef.current?.value?.trim() || "";
+    console.log("📧 Email capturado pela ref:", currentEmail);
+
+    if (!currentEmail) {
       setMessage({ text: "Preencha o e-mail antes de prosseguir.", type: "error" });
       return;
     }
 
+    // (Opcional) Sincroniza o estado form.email
+    if (currentEmail !== form.email) {
+      setForm(prev => ({ ...prev, email: currentEmail }));
+    }
+
     const uniqueId = generateUniqueId();
 
-    const formData = {
+    // Dados para salvar localmente (para restauração após o pagamento)
+    const pendingData = {
       officeName: form.officeName,
       documentType: tipoDocumento,
       documentNumber: numeroDocumento,
@@ -121,30 +133,33 @@ export default function Register() {
       address: endereco,
       number: numero,
       complement: complemento,
-      email: form.email,
+      email: currentEmail,
       phone: telefone,
       ownerName: ownerName,
       externalReference: uniqueId,
     };
-    localStorage.setItem("pendingRegistration", JSON.stringify(formData));
+    localStorage.setItem("pendingRegistration", JSON.stringify(pendingData));
 
     setLoading(true);
 
     try {
-      // 🔥 CORREÇÃO: envia todos os dados para o backend criar a pendingSubscription corretamente
+      // Payload explícito para a API de criação de assinatura
+      const payload = {
+        email: currentEmail,
+        officeName: form.officeName,
+        documentType: tipoDocumento,
+        documentNumber: numeroDocumento,
+        phone: telefone,
+        cep: cep,
+        address: endereco,
+        externalReference: uniqueId,
+      };
+      console.log("📤 Payload enviado:", payload);
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/payments/create-subscription`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: form.email,
-          officeName: form.officeName,
-          documentType: tipoDocumento,
-          documentNumber: numeroDocumento,
-          phone: telefone,
-          cep: cep,
-          address: endereco,
-          externalReference: uniqueId,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -281,7 +296,6 @@ export default function Register() {
         )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {/* Campos do formulário... */}
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
               Nome da Oficina
@@ -409,11 +423,17 @@ export default function Register() {
             <input
               name="email"
               type="email"
+              ref={emailInputRef}
               placeholder="contato@oficina.com"
               value={form.email}
               onChange={handleChange}
               onFocus={handleFocus}
-              onBlur={handleBlur}
+              onBlur={(e) => {
+                handleBlur(e);
+                if (e.target.value !== form.email) {
+                  setForm(prev => ({ ...prev, email: e.target.value }));
+                }
+              }}
               style={inputStyle}
               required
               disabled={loading}
@@ -438,10 +458,10 @@ export default function Register() {
 
           <div>
             <label style={{ display: "block", marginBottom: "8px", color: "#a0a0a0", fontWeight: "600" }}>
-              Nome do Responsavel
+              Nome do Responsável
             </label>
             <input
-              placeholder="Seu Usuário"
+              placeholder="Seu nome completo"
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
               onFocus={handleFocus}
