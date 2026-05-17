@@ -99,7 +99,7 @@ export class EstimatesService {
     const client = await this.prisma.client.findFirst({
       where: {
         id: clientId,
-        tenantId,
+        
       },
     });
 
