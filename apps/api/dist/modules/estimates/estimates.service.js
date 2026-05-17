@@ -238,56 +238,128 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
         });
     }
     async convertToInvoice(estimateId, tenantId) {
-        let retries = 0;
+        this.logger.log(`🔄 Iniciando conversão do orçamento ${estimateId} (tenant ${tenantId})`);
+        if (!estimateId || estimateId <= 0) {
+            throw new common_1.BadRequestException('ID do orçamento inválido');
+        }
+        if (!tenantId?.trim()) {
+            throw new common_1.BadRequestException('Tenant ID inválido');
+        }
         const maxRetries = 3;
-        while (retries < maxRetries) {
+        let attempt = 0;
+        while (attempt < maxRetries) {
             try {
                 return await this.prisma.$transaction(async (tx) => {
-                    const lockedEstimate = await tx.$queryRaw `SELECT * FROM "Estimate" WHERE id = ${estimateId} AND "tenantId" = ${tenantId} FOR UPDATE`;
-                    const estimate = lockedEstimate[0];
-                    if (!estimate)
+                    const lockedEstimate = await tx.$queryRaw `
+            SELECT * FROM "Estimate"
+            WHERE id = ${estimateId}
+              AND "tenantId" = ${tenantId}
+              AND "deletedAt" IS NULL
+            FOR UPDATE
+          `;
+                    if (!lockedEstimate || lockedEstimate.length === 0) {
                         throw new common_1.NotFoundException('Orçamento não encontrado');
-                    if (estimate.status === client_1.EstimateStatus.CONVERTED)
-                        throw new common_1.ConflictException('Orçamento já convertido');
-                    if (estimate.status !== client_1.EstimateStatus.DRAFT && estimate.status !== client_1.EstimateStatus.APPROVED) {
-                        throw new common_1.BadRequestException('Status inválido para conversão');
                     }
-                    const items = await tx.estimateItem.findMany({ where: { estimateId: estimate.id } });
-                    try {
-                        await tx.$executeRaw `CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 100000 INCREMENT 1`;
+                    const estimate = lockedEstimate[0];
+                    if (estimate.status === client_1.EstimateStatus.CONVERTED) {
+                        throw new common_1.ConflictException('Orçamento já foi convertido em fatura');
                     }
-                    catch (e) { }
-                    const seqResult = await tx.$queryRaw `SELECT nextval('invoice_number_seq') as nextval`;
-                    const invoiceNumber = `FAT-${seqResult[0].nextval}`;
+                    if (![client_1.EstimateStatus.DRAFT, client_1.EstimateStatus.APPROVED, client_1.EstimateStatus.SENT].includes(estimate.status)) {
+                        throw new common_1.BadRequestException(`Orçamento com status ${estimate.status} não pode ser convertido`);
+                    }
+                    const existingInvoice = await tx.invoice.findUnique({
+                        where: { estimateId: estimate.id },
+                    });
+                    if (existingInvoice) {
+                        throw new common_1.ConflictException(`Este orçamento já possui a fatura ${existingInvoice.number}`);
+                    }
+                    const items = await tx.estimateItem.findMany({
+                        where: { estimateId: estimate.id },
+                    });
+                    if (items.length === 0) {
+                        throw new common_1.BadRequestException('Orçamento sem itens não pode ser convertido');
+                    }
+                    const invoiceNumber = await this.generateInvoiceNumber(tx, tenantId);
                     const invoice = await tx.invoice.create({
                         data: {
                             tenantId: estimate.tenantId,
                             clientId: estimate.clientId,
                             total: estimate.total,
-                            status: 'PENDING',
+                            status: client_1.InvoiceStatus.PENDING,
                             number: invoiceNumber,
                             estimateId: estimate.id,
-                            items: { create: items.map((item) => ({ ...item, id: undefined })) },
+                            pdfStatus: 'pending',
+                            items: {
+                                createMany: {
+                                    data: items.map((item) => ({
+                                        description: item.description,
+                                        quantity: item.quantity,
+                                        price: item.price,
+                                        total: item.total,
+                                        issPercent: item.issPercent ?? null,
+                                    })),
+                                },
+                            },
                         },
                         include: { items: true, client: true },
                     });
-                    await tx.estimate.update({ where: { id: estimateId }, data: { status: client_1.EstimateStatus.CONVERTED } });
-                    this.logger.log(`✅ Orçamento ${estimateId} convertido para ${invoice.number}`);
+                    await tx.estimate.update({
+                        where: { id: estimate.id },
+                        data: { status: client_1.EstimateStatus.CONVERTED },
+                    });
+                    this.logger.log(`✅ Orçamento ${estimateId} convertido para fatura ${invoice.number} (ID: ${invoice.id})`);
                     return invoice;
+                }, {
+                    isolationLevel: client_1.Prisma.TransactionIsolationLevel.Serializable,
+                    timeout: 10000,
                 });
             }
             catch (error) {
-                if (error.code === 'P2002' && retries < maxRetries - 1) {
-                    retries++;
-                    this.logger.warn(`⚠️ Tentativa ${retries}/${maxRetries}`);
-                    await new Promise((resolve) => setTimeout(resolve, 100 * retries));
+                attempt++;
+                const isRetryable = error.code === 'P2002' || error.code === 'P2034' || error.message?.includes('deadlock');
+                if (isRetryable && attempt < maxRetries) {
+                    this.logger.warn(`⚠️ Tentativa ${attempt} falhou. Retentativa em ${attempt * 200}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, attempt * 200));
                     continue;
                 }
-                this.logger.error(`❌ Erro conversão: ${error.message}`);
-                throw error;
+                this.logger.error(`❌ Erro ao converter orçamento ${estimateId}: ${error.message}`, error.stack);
+                if (error.code === 'P2002') {
+                    throw new common_1.ConflictException('Já existe uma fatura com este número. Tente novamente.');
+                }
+                if (error instanceof common_1.NotFoundException || error instanceof common_1.BadRequestException || error instanceof common_1.ConflictException) {
+                    throw error;
+                }
+                throw new common_1.InternalServerErrorException('Falha na conversão do orçamento. Tente mais tarde.');
             }
         }
-        throw new common_1.InternalServerErrorException('Erro na conversão');
+        throw new common_1.InternalServerErrorException('Máximo de tentativas excedido. Não foi possível converter.');
+    }
+    async generateInvoiceNumber(tx, tenantId) {
+        const year = new Date().getFullYear();
+        const lastInvoice = await tx.invoice.findFirst({
+            where: {
+                tenantId,
+                number: { startsWith: `${year}/` },
+            },
+            orderBy: { number: 'desc' },
+            select: { number: true },
+        });
+        let sequence = 1;
+        if (lastInvoice) {
+            const parts = lastInvoice.number.split('/');
+            if (parts.length === 2) {
+                const lastSeq = parseInt(parts[1], 10);
+                if (!isNaN(lastSeq))
+                    sequence = lastSeq + 1;
+            }
+        }
+        const paddedSeq = sequence.toString().padStart(4, '0');
+        const newNumber = `${year}/${paddedSeq}`;
+        const existing = await tx.invoice.findUnique({ where: { number: newNumber } });
+        if (existing) {
+            return `${year}/${paddedSeq}-${Math.floor(Math.random() * 1000)}`;
+        }
+        return newNumber;
     }
     async remove(id, tenantId) {
         const estimate = await this.findOne(id, tenantId);

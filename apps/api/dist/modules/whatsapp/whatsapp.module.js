@@ -20,11 +20,7 @@ exports.WhatsappModule = WhatsappModule;
 exports.WhatsappModule = WhatsappModule = __decorate([
     (0, common_1.Module)({
         imports: [prisma_module_1.PrismaModule, public_share_module_1.PublicShareModule],
-        providers: [
-            whatsapp_service_1.WhatsappService,
-            send_estimate_whatsapp_service_1.SendEstimateWhatsappService,
-            send_invoice_whatsapp_service_1.SendInvoiceWhatsappService,
-        ],
+        providers: [whatsapp_service_1.WhatsappService, send_estimate_whatsapp_service_1.SendEstimateWhatsappService, send_invoice_whatsapp_service_1.SendInvoiceWhatsappService],
         controllers: [whatsapp_controller_1.WhatsappController],
         exports: [send_estimate_whatsapp_service_1.SendEstimateWhatsappService, send_invoice_whatsapp_service_1.SendInvoiceWhatsappService],
     })

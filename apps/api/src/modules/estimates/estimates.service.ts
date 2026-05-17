@@ -232,14 +232,31 @@ export class EstimatesService {
     });
   }
 
+  /**
+   * 🔥 CONVERSÃO CORRIGIDA E OTIMIZADA
+   * - Sem o erro "Unknown argument tenantId" porque NÃO passa tenantId no findMany de items
+   * - Utiliza FOR UPDATE para lock pessimista
+   * - Geração profissional de número de fatura (ANO/SEQ)
+   * - Transação com retry e isolamento serializável
+   */
   async convertToInvoice(estimateId: number, tenantId: string) {
-    let retries = 0;
-    const maxRetries = 3;
+    this.logger.log(`🔄 Iniciando conversão do orçamento ${estimateId} (tenant ${tenantId})`);
 
-    while (retries < maxRetries) {
+    if (!estimateId || estimateId <= 0) {
+      throw new BadRequestException('ID do orçamento inválido');
+    }
+    if (!tenantId?.trim()) {
+      throw new BadRequestException('Tenant ID inválido');
+    }
+
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
       try {
         return await this.prisma.$transaction(async (tx) => {
-          const lockedEstimate = await tx.$queryRaw<Array<any>>`
+          // 1. Lock pessimista no orçamento
+          const lockedEstimate = await tx.$queryRaw<any[]>`
             SELECT * FROM "Estimate"
             WHERE id = ${estimateId}
               AND "tenantId" = ${tenantId}
@@ -247,34 +264,40 @@ export class EstimatesService {
             FOR UPDATE
           `;
 
+          if (!lockedEstimate || lockedEstimate.length === 0) {
+            throw new NotFoundException('Orçamento não encontrado');
+          }
           const estimate = lockedEstimate[0];
-          if (!estimate) throw new NotFoundException('Orçamento não encontrado');
 
+          // 2. Validações de status
           if (estimate.status === EstimateStatus.CONVERTED) {
-            throw new ConflictException('Orçamento já convertido');
+            throw new ConflictException('Orçamento já foi convertido em fatura');
+          }
+          if (![EstimateStatus.DRAFT, EstimateStatus.APPROVED, EstimateStatus.SENT].includes(estimate.status)) {
+            throw new BadRequestException(`Orçamento com status ${estimate.status} não pode ser convertido`);
           }
 
-          if (estimate.status !== EstimateStatus.DRAFT && estimate.status !== EstimateStatus.APPROVED) {
-            throw new BadRequestException('Somente orçamentos pendentes ou aprovados podem ser convertidos');
-          }
-
+          // 3. Verificar se já existe fatura vinculada
           const existingInvoice = await tx.invoice.findUnique({
             where: { estimateId: estimate.id },
           });
           if (existingInvoice) {
-            throw new ConflictException(`Este orçamento já foi convertido para a fatura ${existingInvoice.number}`);
+            throw new ConflictException(`Este orçamento já possui a fatura ${existingInvoice.number}`);
           }
 
+          // 4. Buscar itens do orçamento (sem tenantId - campo não existe em EstimateItem)
           const items = await tx.estimateItem.findMany({
             where: { estimateId: estimate.id },
           });
 
-          if (!items.length) {
+          if (items.length === 0) {
             throw new BadRequestException('Orçamento sem itens não pode ser convertido');
           }
 
-          const invoiceNumber = `FAT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+          // 5. Gerar número único de fatura (formato ANO/SEQUENCIAL)
+          const invoiceNumber = await this.generateInvoiceNumber(tx, tenantId);
 
+          // 6. Criar fatura e seus itens
           const invoice = await tx.invoice.create({
             data: {
               tenantId: estimate.tenantId,
@@ -283,43 +306,89 @@ export class EstimatesService {
               status: InvoiceStatus.PENDING,
               number: invoiceNumber,
               estimateId: estimate.id,
-              items: {
-                create: items.map((item) => ({
-                  description: item.description,
-                  quantity: item.quantity,
-                  price: item.price,
-                  total: item.total,
-                  issPercent: item.issPercent ?? 0,
-                })),
-              },
               pdfStatus: 'pending',
+              items: {
+                createMany: {
+                  data: items.map((item) => ({
+                    description: item.description,
+                    quantity: item.quantity,
+                    price: item.price,
+                    total: item.total,
+                    issPercent: item.issPercent ?? null,
+                  })),
+                },
+              },
             },
-            include: { items: true, client: true, tenant: true },
+            include: { items: true, client: true },
           });
 
+          // 7. Atualizar status do orçamento
           await tx.estimate.update({
             where: { id: estimate.id },
             data: { status: EstimateStatus.CONVERTED },
           });
 
-          this.logger.log(`✅ Orçamento ${estimate.id} convertido para ${invoice.number}`);
+          this.logger.log(`✅ Orçamento ${estimateId} convertido para fatura ${invoice.number} (ID: ${invoice.id})`);
           return invoice;
+
+        }, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          timeout: 10000,
         });
       } catch (error: any) {
-        if (error.code === 'P2002' && retries < maxRetries - 1) {
-          retries++;
-          this.logger.warn(`⚠️ Retry ${retries}/${maxRetries} na conversão do orçamento ${estimateId}`);
-          await new Promise((resolve) => setTimeout(resolve, retries * 150));
+        attempt++;
+        const isRetryable = error.code === 'P2002' || error.code === 'P2034' || error.message?.includes('deadlock');
+        if (isRetryable && attempt < maxRetries) {
+          this.logger.warn(`⚠️ Tentativa ${attempt} falhou. Retentativa em ${attempt * 200}ms...`);
+          await new Promise(resolve => setTimeout(resolve, attempt * 200));
           continue;
         }
         this.logger.error(`❌ Erro ao converter orçamento ${estimateId}: ${error.message}`, error.stack);
         if (error.code === 'P2002') {
-          throw new ConflictException('Já existe uma fatura vinculada a este orçamento');
+          throw new ConflictException('Já existe uma fatura com este número. Tente novamente.');
         }
-        throw error;
+        if (error instanceof NotFoundException || error instanceof BadRequestException || error instanceof ConflictException) {
+          throw error;
+        }
+        throw new InternalServerErrorException('Falha na conversão do orçamento. Tente mais tarde.');
       }
     }
-    throw new InternalServerErrorException('Falha ao converter orçamento em fatura');
+    throw new InternalServerErrorException('Máximo de tentativas excedido. Não foi possível converter.');
+  }
+
+  /**
+   * Gera número único de fatura no formato ANO/SEQUENCIAL (ex: 2026/0001)
+   * Atomicidade garantida pela transação atual.
+   */
+  private async generateInvoiceNumber(tx: Prisma.TransactionClient, tenantId: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const lastInvoice = await tx.invoice.findFirst({
+      where: {
+        tenantId,
+        number: { startsWith: `${year}/` },
+      },
+      orderBy: { number: 'desc' },
+      select: { number: true },
+    });
+
+    let sequence = 1;
+    if (lastInvoice) {
+      const parts = lastInvoice.number.split('/');
+      if (parts.length === 2) {
+        const lastSeq = parseInt(parts[1], 10);
+        if (!isNaN(lastSeq)) sequence = lastSeq + 1;
+      }
+    }
+
+    const paddedSeq = sequence.toString().padStart(4, '0');
+    const newNumber = `${year}/${paddedSeq}`;
+
+    // Fallback extremamente raro (colisão)
+    const existing = await tx.invoice.findUnique({ where: { number: newNumber } });
+    if (existing) {
+      return `${year}/${paddedSeq}-${Math.floor(Math.random() * 1000)}`;
+    }
+    return newNumber;
   }
 
   async remove(id: number, tenantId: string) {
