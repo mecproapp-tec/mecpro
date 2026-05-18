@@ -96,25 +96,32 @@ export class AppointmentsService {
 
     try {
       const now = new Date();
-      const oneHourFromNow = new Date(now.getTime() + 60 * 60000);
+      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60000);
+      const sixMinutesFromNow = new Date(now.getTime() + 6 * 60000);
 
       const appointments = await this.prisma.appointment.findMany({
         where: {
-          date: { gte: now, lte: oneHourFromNow },
+          date: {
+            gte: fiveMinutesFromNow,
+            lte: sixMinutesFromNow,
+          },
         },
-        include: { client: true, tenant: true },
+        include: {
+          client: true,
+          tenant: true,
+        },
       });
 
       for (const app of appointments) {
-        const minutesUntil = Math.floor((app.date.getTime() - now.getTime()) / 60000);
-        
-        let title = 'Agendamento próximo';
-        if (minutesUntil <= 15) title = 'Agendamento em 15 minutos';
-        else if (minutesUntil <= 60) title = 'Agendamento em 1 hora';
-
+        const title = 'Agendamento em 5 minutos';
         const message = `${app.client.name} - ${app.client.vehicle || 'Veículo'} as ${app.date.toLocaleTimeString('pt-BR')}`;
 
-        await this.notificationsService.createForAppointment(app.id, app.tenantId, title, message);
+        await this.notificationsService.createForAppointment(
+          app.id,
+          app.tenantId,
+          title,
+          message,
+        );
       }
     } catch (error) {
       this.logger.error(`Erro no cron: ${error.message}`);
