@@ -4,20 +4,29 @@
 <meta charset="UTF-8">
 <title>Fatura #{{invoiceNumber}}</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
   body {
-    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
     background: #f0f4f8;
     padding: 40px 20px;
+    line-height: 1.4;
   }
+
   .document {
     max-width: 1100px;
-    margin: auto;
+    margin: 0 auto;
     background: white;
     border-radius: 16px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     overflow: hidden;
   }
+
+  /* HEADER */
   .header {
     background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%);
     color: white;
@@ -25,28 +34,47 @@
     text-align: center;
     border-bottom: 4px solid #00e5ff;
   }
+
   .header h1 {
     font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
     margin-bottom: 8px;
   }
+
+  /* BODY */
   .body {
     padding: 30px;
   }
+
+  /* COMPANY INFO */
   .company-info {
     text-align: right;
     margin-bottom: 30px;
     padding-bottom: 20px;
     border-bottom: 2px solid #e0e0e0;
   }
+
   .company-info h2 {
     color: #000000;
-    margin-bottom: 5px;
+    font-size: 20px;
+    margin-bottom: 8px;
   }
+
   .company-info p {
     color: #666;
     font-size: 12px;
     margin: 3px 0;
   }
+
+  .logo {
+    max-width: 120px;
+    max-height: 60px;
+    object-fit: contain;
+    margin-bottom: 10px;
+  }
+
+  /* CLIENT BOX */
   .client-box {
     background: linear-gradient(145deg, #f8f9fa 0%, #ffffff 100%);
     padding: 20px;
@@ -54,24 +82,38 @@
     margin-bottom: 25px;
     border: 1px solid #e0e0e0;
   }
+
   .client-box h3 {
     background: #0a0a0a;
     color: #00e5ff;
     display: inline-block;
     padding: 6px 16px;
     border-radius: 20px;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 600;
     margin-bottom: 15px;
+    letter-spacing: 0.5px;
   }
+
   .client-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 12px 20px;
   }
+
+  .client-item {
+    font-size: 13px;
+    color: #333;
+  }
+
   .client-item strong {
     min-width: 80px;
     display: inline-block;
+    color: #000;
+    font-weight: 600;
   }
+
+  /* DATES */
   .dates {
     background: #0a0a0a;
     color: #00e5ff;
@@ -83,34 +125,64 @@
     font-size: 13px;
     font-weight: 500;
   }
+
+  /* TABELA */
+  .table-wrapper {
+    overflow-x: auto;
+    margin: 20px 0;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 20px 0;
     font-size: 13px;
+    min-width: 600px;
   }
+
   th {
     background: #0a0a0a;
     color: #00e5ff;
     padding: 14px 12px;
     text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
   }
+
   td {
     padding: 16px 12px;
     border-bottom: 1px solid #e0e0e0;
+    vertical-align: top;
   }
-  .text-right { text-align: right; }
-  .text-center { text-align: center; }
+
+  .text-right {
+    text-align: right;
+  }
+
+  .text-center {
+    text-align: center;
+  }
+
+  /* Descrição - permite quebra de linha */
+  .description-cell {
+    word-break: break-word;
+    white-space: normal;
+    max-width: 300px;
+  }
+
+  /* TOTAIS */
   .totals {
     margin-top: 25px;
     text-align: right;
     border-top: 2px solid #e0e0e0;
     padding-top: 20px;
   }
+
   .totals p {
     margin: 8px 0;
     font-size: 14px;
+    color: #333;
   }
+
   .total-geral {
     font-size: 22px;
     font-weight: bold;
@@ -121,6 +193,8 @@
     border-radius: 40px;
     margin-top: 15px;
   }
+
+  /* FOOTER */
   .footer {
     background: #f8f9fa;
     padding: 20px;
@@ -129,11 +203,36 @@
     color: #888;
     border-top: 1px solid #e0e0e0;
   }
-  .logo {
-    max-width: 120px;
-    max-height: 60px;
-    object-fit: contain;
-    margin-bottom: 10px;
+
+  .footer p {
+    margin: 4px 0;
+  }
+
+  /* RESPONSIVIDADE */
+  @media print {
+    body {
+      background: white;
+      padding: 0;
+    }
+    .document {
+      box-shadow: none;
+      border-radius: 0;
+    }
+    .dates {
+      background: #0a0a0a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    th {
+      background: #0a0a0a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .total-geral {
+      background: #0a0a0a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   }
 </style>
 </head>
@@ -142,14 +241,20 @@
   <div class="header">
     <h1>FATURA Nº {{invoiceNumber}}</h1>
   </div>
+
   <div class="body">
+    <!-- INFORMAÇÕES DA EMPRESA -->
     <div class="company-info">
-      {{#if companyLogo}}<img src="{{companyLogo}}" class="logo" alt="Logo">{{/if}}
+      {{#if companyLogo}}
+        <img src="{{companyLogo}}" class="logo" alt="Logo">
+      {{/if}}
       <h2>{{companyName}}</h2>
       <p>{{companyDocument}} | {{companyPhone}}</p>
       <p>{{companyEmail}}</p>
       <p>{{companyAddress}}</p>
     </div>
+
+    <!-- DADOS DO CLIENTE -->
     <div class="client-box">
       <h3>DADOS DO CLIENTE</h3>
       <div class="client-grid">
@@ -161,43 +266,53 @@
         <div class="client-item"><strong>Endereço:</strong> {{client.address}}</div>
       </div>
     </div>
+
+    <!-- DATAS -->
     <div class="dates">
-      <span>Emissão: {{issueDate}}</span>
-      <span>Vencimento: {{dueDate}}</span>
+      <span>📅 Emissão: {{issueDate}}</span>
+      <span>⏰ Vencimento: {{dueDate}}</span>
     </div>
-    </table>
-      <thead>
-        <tr>
-          <th>Descrição</th>
-          <th class="text-right">Qtde</th>
-          <th class="text-right">Valor Unit.</th>
-          <th class="text-center">ISS %</th>
-          <th class="text-right">ISS Valor</th>
-          <th class="text-right">Total c/ ISS</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each items}}
-        <tr>
-          <td>{{description}}</td>
-          <td class="text-right">{{quantity}}</td>
-          <td class="text-right">R$ {{unitPrice}}</td>
-          <td class="text-center">{{issPercent}}%</td>
-          <td class="text-right">R$ {{issValue}}</td>
-          <td class="text-right">R$ {{totalWithIss}}</td>
-        </tr>
-        {{/each}}
-      </tbody>
-    </table>
+
+    <!-- TABELA DE ITENS -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th class="text-right">Qtde</th>
+            <th class="text-right">Valor Unit.</th>
+            <th class="text-center">ISS %</th>
+            <th class="text-right">ISS Valor</th>
+            <th class="text-right">Total c/ ISS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td class="description-cell">{{description}}</td>
+            <td class="text-right">{{quantity}}</td>
+            <td class="text-right">R$ {{unitPrice}}</td>
+            <td class="text-center">{{issPercent}}%</td>
+            <td class="text-right">R$ {{issValue}}</td>
+            <td class="text-right">R$ {{totalWithIss}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TOTAIS -->
     <div class="totals">
-      <p>Subtotal (sem ISS): R$ {{subtotal}}</p>
-      <p>Total de ISS: R$ {{totalIss}}</p>
-      <div class="total-geral">TOTAL GERAL: R$ {{total}}</div>
+      <p>💰 Subtotal (sem ISS): R$ {{subtotal}}</p>
+      <p>📊 Total de ISS: R$ {{totalIss}}</p>
+      <div class="total-geral">🎯 TOTAL GERAL: R$ {{total}}</div>
     </div>
   </div>
+
+  <!-- FOOTER -->
   <div class="footer">
     <p>{{companyName}} - {{companyPhone}} | {{companyEmail}}</p>
-    <p>Esta fatura é um documento oficial.</p>
+    <p>📄 Esta fatura é um documento oficial. Em caso de dúvidas, entre em contato.</p>
   </div>
 </div>
 </body>
