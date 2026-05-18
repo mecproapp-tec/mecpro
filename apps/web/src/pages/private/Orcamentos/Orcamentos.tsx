@@ -136,25 +136,23 @@ export default function Orcamentos() {
     }
   };
 
-  // ========== FUNÇÃO handleStatusChange CORRIGIDA ==========
+  // 🔥 FUNÇÃO CORRIGIDA: envia SOMENTE o status (PATCH parcial)
   const handleStatusChange = async (orcamento: Estimate, novoStatus: "accepted" | "pending") => {
     if (!orcamento.clientId) {
       toast.error("Cliente inválido para este orçamento.");
       return;
     }
 
-    // Evita requisição desnecessária se o status já for o mesmo
+    // Evita requisição desnecessária se o status já é o mesmo
     if (orcamento.status === novoStatus) return;
 
     try {
-      // Envia SOMENTE o status (PATCH parcial)
       const payload = {
         status: statusMap[novoStatus], // "APPROVED" ou "DRAFT"
       };
 
       await updateEstimate(orcamento.id, payload);
 
-      // Atualiza estado local
       setOrcamentos(prev =>
         prev.map(o => (o.id === orcamento.id ? { ...o, status: novoStatus } : o))
       );
@@ -165,7 +163,6 @@ export default function Orcamentos() {
       toast.error(err.response?.data?.message || "Erro ao alterar status");
     }
   };
-  // ========== FIM DA CORREÇÃO ==========
 
   const handleConverter = async (orcamento: Estimate) => {
     if (convertingIds.has(orcamento.id)) {
@@ -391,7 +388,7 @@ export default function Orcamentos() {
                   <th style={styles.th}>Total (R$)</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Ações</th>
-                 </tr>
+                </tr>
               </thead>
               <tbody>
                 {orcamentosFiltrados.map((o, index) => {

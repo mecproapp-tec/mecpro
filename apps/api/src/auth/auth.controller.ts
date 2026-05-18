@@ -91,15 +91,24 @@ export class AuthController {
     return this.authService.logout(user.id, user.sessionToken);
   }
 
-  // 🔥 NOVA ROTA: GET /auth/me - retorna os dados do usuário autenticado
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMe(@CurrentUser() user: UserPayload) {
-    // Buscar dados completos do usuário no banco
     const userData = await this.authService.getUserById(user.id);
     return {
       success: true,
       user: userData,
     };
+  }
+
+  // 🔥 NOVA ROTA
+  @Public()
+  @Post('complete-registration')
+  @HttpCode(HttpStatus.OK)
+  async completeRegistration(@Body() body: { token: string; password: string }) {
+    if (!body.token || !body.password) {
+      throw new BadRequestException('Token e senha são obrigatórios');
+    }
+    return this.authService.completeRegistration(body.token, body.password);
   }
 }

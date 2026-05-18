@@ -75,7 +75,7 @@ export class PaymentController {
     const finalExternalRef = externalReference || randomUUID();
 
     // =========================================
-    // URL DE RETORNO
+    // URL DE RETORNO (CORRIGIDA)
     // =========================================
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
@@ -86,7 +86,7 @@ export class PaymentController {
       );
     }
 
-    const backUrl = `${frontendUrl}/register?payment=success`;
+    const backUrl = `${frontendUrl}/register/success`;
 
     // =========================================
     // REMOVER PENDENTE ANTIGO

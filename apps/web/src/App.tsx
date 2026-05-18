@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/public/Login/Login";
 import Register from "./pages/public/Register/Register";
+import RegisterSuccess from "./pages/public/Register/RegisterSuccess";
+import CompleteRegistration from "./pages/public/Register/CompleteRegistration";
 import Home from "./pages/private/Home/Home";
 import Clientes from "./pages/private/Clientes/Clientes";
 import NovoCliente from "./pages/private/Clientes/NovoCliente";
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/register/success" element={<RegisterSuccess />} />
+        <Route path="/complete-registration" element={<CompleteRegistration />} />
         <Route path="/public/estimate/:token" element={<PublicEstimate />} />
         <Route path="/public/invoice/:token" element={<PublicInvoice />} />
         <Route path="/home" element={<PrivateRoute><Home /></PrivateRoute>} />

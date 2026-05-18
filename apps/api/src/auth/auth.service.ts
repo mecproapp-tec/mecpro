@@ -207,12 +207,10 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('Credenciais inválidas');
     if (!user.tenantId) throw new UnauthorizedException('Usuário sem tenant');
 
-    // 🔒 Verifica status do usuário
     if (user.status === 'BLOCKED') {
       throw new UnauthorizedException('Usuário bloqueado. Contate o suporte.');
     }
 
-    // 🔥 VERIFICAÇÃO DO TENANT: se o tenant não estiver ACTIVE, bloqueia acesso
     if (!user.tenant || user.tenant.status !== 'ACTIVE') {
       this.logger.warn(`Tentativa de login para tenant bloqueado/cancelado: ${email}`);
       throw new UnauthorizedException('Sua conta da oficina foi bloqueada ou cancelada. Entre em contato com o suporte.');
@@ -288,7 +286,7 @@ export class AuthService {
 
     const stored = await this.prisma.refreshToken.findFirst({
       where: { sessionToken },
-      include: { user: { include: { tenant: true } } }, // inclui tenant para verificar status
+      include: { user: { include: { tenant: true } } },
     });
 
     if (!stored) throw new UnauthorizedException('Refresh token inválido');
@@ -301,7 +299,6 @@ export class AuthService {
     });
     if (!session) throw new UnauthorizedException('Sessão não encontrada');
 
-    // 🔥 Verifica status do usuário e do tenant durante o refresh
     if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Usuário bloqueado');
     }
@@ -344,7 +341,7 @@ export class AuthService {
             id: true,
             name: true,
             logoUrl: true,
-            status: true, // inclui status do tenant
+            status: true,
           },
         },
       },
@@ -352,8 +349,6 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Usuário não encontrado');
     }
-    // 🔥 Opcional: se o tenant estiver bloqueado, retornar erro ou aviso
-    // Não bloqueamos o método, apenas retornamos o status para front-end decidir.
     return {
       id: user.id,
       name: user.name,
@@ -365,5 +360,33 @@ export class AuthService {
       logoUrl: user.tenant?.logoUrl || null,
       tenantStatus: user.tenant?.status || null,
     };
+  }
+
+  // =====================================================
+  //  NOVO MÉTODO - completeRegistration
+  // =====================================================
+  async completeRegistration(token: string, password: string) {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: {
+        registrationToken: token,
+        registrationTokenExpiresAt: { gt: new Date() },
+      },
+    });
+    if (!tenant) {
+      throw new BadRequestException('Link inválido ou expirado');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await this.prisma.user.update({
+      where: { email: tenant.email },
+      data: { password: hashedPassword },
+    });
+
+    await this.prisma.tenant.update({
+      where: { id: tenant.id },
+      data: { registrationToken: null, registrationTokenExpiresAt: null },
+    });
+
+    return { success: true, message: 'Senha definida com sucesso! Agora faça login.' };
   }
 }
