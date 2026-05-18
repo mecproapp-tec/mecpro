@@ -1,3 +1,4 @@
+// apps/api/src/modules/invoices/invoices.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -21,26 +22,40 @@ export class InvoicesService {
     private storageService: StorageService,
   ) {}
 
+  // 🔥 CORREÇÃO: Método calculate agora inclui ISS igual ao do orçamento
   private calculate(items: any[]) {
     let total = new Prisma.Decimal(0);
-    const normalized = items.map((item) => {
+
+    const normalizedItems = items.map((item) => {
       const priceValue = typeof item.price === 'string' ? parseFloat(item.price) : item.price;
       const price = new Prisma.Decimal(isNaN(priceValue) ? 0 : priceValue);
       const quantity = new Prisma.Decimal(item.quantity || 1);
-      const itemTotal = price.times(quantity);
+      const issPercent = new Prisma.Decimal(item.issPercent || 0);
+
+      const subtotal = price.times(quantity);
+      const tax = subtotal.times(issPercent).dividedBy(100);
+      const itemTotal = subtotal.plus(tax);
+
       total = total.plus(itemTotal);
+
       return {
         description: item.description || '-',
         quantity: quantity.toNumber(),
         price,
+        issPercent: issPercent.toNumber(),
         total: itemTotal,
       };
     });
-    return { items: normalized, total };
+
+    return {
+      items: normalizedItems,
+      total,
+    };
   }
 
   async create(tenantId: string, data: any) {
-    const { clientId, items: inputItems } = data;
+    const { clientId, items: inputItems, date } = data;
+    
     if (!tenantId) throw new BadRequestException('TenantId não informado');
     if (!clientId) throw new BadRequestException('Cliente não informado');
     if (!inputItems?.length) throw new BadRequestException('Fatura sem itens');
@@ -61,6 +76,7 @@ export class InvoicesService {
     };
 
     const invoiceNumber = await generateUniqueNumber();
+    const invoiceDate = date ? new Date(date) : new Date();
 
     const invoice = await this.prisma.invoice.create({
       data: {
@@ -69,12 +85,13 @@ export class InvoicesService {
         number: invoiceNumber,
         total,
         status: 'PENDING',
+        createdAt: invoiceDate,
         items: { create: items },
       },
       include: { items: true, client: true, tenant: true },
     });
 
-    this.logger.log(`Fatura criada ID: ${invoice.id}`);
+    this.logger.log(`Fatura criada ID: ${invoice.id}, Total: ${total}`);
     return invoice;
   }
 
