@@ -416,8 +416,7 @@ export class EstimatesService {
     estimateId: number,
     tenantId: string,
   ) {
-    // 🔍 LOG DE DIAGNÓSTICO PARA VERIFICAR SE O CÓDIGO CORRETO ESTÁ RODANDO
-    this.logger.log(`🚀 VERSÃO CORRIGIDA - convertToInvoice chamada para estimate ${estimateId}`);
+    this.logger.log(`🚀 convertToInvoice chamada para estimate ${estimateId}`);
 
     try {
       return await this.prisma.$transaction(
@@ -459,6 +458,7 @@ export class EstimatesService {
             );
           }
 
+          // CORREÇÃO: buscar itens sem tenantId (campo não existe no modelo)
           const items = await tx.estimateItem.findMany({
             where: {
               estimateId: estimate.id,
@@ -556,7 +556,6 @@ export class EstimatesService {
         throw error;
       }
 
-      // Tratamento específico para violação de chave única (número de fatura duplicado)
       if (error.code === 'P2002') {
         throw new ConflictException('Número de fatura duplicado. Tente novamente.');
       }
@@ -568,7 +567,6 @@ export class EstimatesService {
     }
   }
 
-  // MÉTODO CORRIGIDO: Gera número de fatura sequencial por mês, evitando duplicidade
   private async generateInvoiceNumber(
     tx: Prisma.TransactionClient,
     tenantId: string,
@@ -598,7 +596,6 @@ export class EstimatesService {
     const sequence = pad(nextSeq, 6);
     const invoiceNumber = `${year}-${month}-${sequence}`;
 
-    // Garantia extra de unicidade (embora o startsWith + order já evite colisão)
     const exists = await tx.invoice.findUnique({
       where: { number: invoiceNumber },
     });

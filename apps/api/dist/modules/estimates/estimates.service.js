@@ -265,6 +265,7 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
         });
     }
     async convertToInvoice(estimateId, tenantId) {
+        this.logger.log(`🚀 convertToInvoice chamada para estimate ${estimateId}`);
         try {
             return await this.prisma.$transaction(async (tx) => {
                 const estimate = await tx.estimate.findFirst({
@@ -344,39 +345,43 @@ let EstimatesService = EstimatesService_1 = class EstimatesService {
                 error instanceof common_1.ConflictException) {
                 throw error;
             }
+            if (error.code === 'P2002') {
+                throw new common_1.ConflictException('Número de fatura duplicado. Tente novamente.');
+            }
             throw new common_1.InternalServerErrorException(error?.message ||
                 'Erro ao converter orçamento');
         }
     }
     async generateInvoiceNumber(tx, tenantId) {
-        const year = new Date().getFullYear();
+        const pad = (num, size) => String(num).padStart(size, '0');
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = pad(now.getMonth() + 1, 2);
         const lastInvoice = await tx.invoice.findFirst({
             where: {
                 tenantId,
-                number: {
-                    startsWith: `${year}/`,
-                },
+                number: { startsWith: `${year}-${month}` },
+                deletedAt: null,
             },
-            orderBy: {
-                number: 'desc',
-            },
-            select: {
-                number: true,
-            },
+            orderBy: { number: 'desc' },
+            select: { number: true },
         });
-        let sequence = 1;
+        let nextSeq = 1;
         if (lastInvoice?.number) {
-            const parts = lastInvoice.number.split('/');
-            if (parts.length === 2) {
-                const lastSeq = parseInt(parts[1], 10);
-                if (!isNaN(lastSeq)) {
-                    sequence = lastSeq + 1;
-                }
-            }
+            const parts = lastInvoice.number.split('-');
+            const lastSeq = parseInt(parts[2], 10);
+            if (!isNaN(lastSeq))
+                nextSeq = lastSeq + 1;
         }
-        return `${year}/${sequence
-            .toString()
-            .padStart(4, '0')}`;
+        const sequence = pad(nextSeq, 6);
+        const invoiceNumber = `${year}-${month}-${sequence}`;
+        const exists = await tx.invoice.findUnique({
+            where: { number: invoiceNumber },
+        });
+        if (exists) {
+            throw new common_1.ConflictException('Falha ao gerar número único da fatura. Tente novamente.');
+        }
+        return invoiceNumber;
     }
     async remove(id, tenantId) {
         const estimate = await this.findOne(id, tenantId);

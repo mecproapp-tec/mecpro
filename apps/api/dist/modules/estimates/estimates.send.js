@@ -65,9 +65,9 @@ let EstimatesSendService = class EstimatesSendService {
             subject: `Orçamento #${estimate.id}`,
             html: `
         <h1>Orçamento #${estimate.id}</h1>
-        <p><strong>Cliente:</strong> ${estimate.clientId?.name || 'N/A'}</p>
+        <p><strong>Cliente:</strong> ${estimate.client?.name || 'N/A'}</p>
         <p><strong>Data:</strong> ${new Date(estimate.date).toLocaleDateString('pt-BR')}</p>
-        <p><strong>Total:</strong> R$ ${estimate.total.toFixed(2)}</p>
+        <p><strong>Total:</strong> R$ ${Number(estimate.total).toFixed(2)}</p>
         <p><strong>Status:</strong> ${estimate.status}</p>
         <p>Segue em anexo o orçamento em PDF.</p>
       `,
