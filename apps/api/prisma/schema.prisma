@@ -129,6 +129,7 @@ model Estimate {
   pdfUrl            String?        @map("pdf_url")
   pdfKey            String?        @map("pdf_key")
   deletedAt         DateTime?
+  paymentMethod     PaymentMethod? 
   client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             EstimateItem[]
@@ -171,6 +172,7 @@ model Invoice {
   pdfKey            String?       @map("pdf_key")
   updatedAt         DateTime      @updatedAt
   deletedAt         DateTime?
+  paymentMethod     PaymentMethod? 
   client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   estimate          Estimate?     @relation(fields: [estimateId], references: [id])
   tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -456,4 +458,11 @@ enum InvoiceStatus {
 enum ShareType {
   ESTIMATE
   INVOICE
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  PIX
 }

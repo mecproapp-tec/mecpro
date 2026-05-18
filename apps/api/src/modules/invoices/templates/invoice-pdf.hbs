@@ -26,7 +26,6 @@
     overflow: hidden;
   }
 
-  /* HEADER */
   .header {
     background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%);
     color: white;
@@ -42,12 +41,10 @@
     margin-bottom: 8px;
   }
 
-  /* BODY */
   .body {
     padding: 30px;
   }
 
-  /* COMPANY INFO */
   .company-info {
     text-align: right;
     margin-bottom: 30px;
@@ -74,7 +71,6 @@
     margin-bottom: 10px;
   }
 
-  /* CLIENT BOX */
   .client-box {
     background: linear-gradient(145deg, #f8f9fa 0%, #ffffff 100%);
     padding: 20px;
@@ -92,7 +88,6 @@
     font-size: 13px;
     font-weight: 600;
     margin-bottom: 15px;
-    letter-spacing: 0.5px;
   }
 
   .client-grid {
@@ -113,7 +108,6 @@
     font-weight: 600;
   }
 
-  /* DATES */
   .dates {
     background: #0a0a0a;
     color: #00e5ff;
@@ -126,7 +120,6 @@
     font-weight: 500;
   }
 
-  /* TABELA */
   .table-wrapper {
     overflow-x: auto;
     margin: 20px 0;
@@ -136,7 +129,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-    min-width: 600px;
+    min-width: 650px;
   }
 
   th {
@@ -145,7 +138,6 @@
     padding: 14px 12px;
     text-align: left;
     font-weight: 600;
-    white-space: nowrap;
   }
 
   td {
@@ -162,14 +154,12 @@
     text-align: center;
   }
 
-  /* Descrição - permite quebra de linha */
   .description-cell {
     word-break: break-word;
     white-space: normal;
     max-width: 300px;
   }
 
-  /* TOTAIS */
   .totals {
     margin-top: 25px;
     text-align: right;
@@ -180,7 +170,7 @@
   .totals p {
     margin: 8px 0;
     font-size: 14px;
-    color: #333;
+    font-weight: 500;
   }
 
   .total-geral {
@@ -194,7 +184,6 @@
     margin-top: 15px;
   }
 
-  /* FOOTER */
   .footer {
     background: #f8f9fa;
     padding: 20px;
@@ -204,11 +193,6 @@
     border-top: 1px solid #e0e0e0;
   }
 
-  .footer p {
-    margin: 4px 0;
-  }
-
-  /* RESPONSIVIDADE */
   @media print {
     body {
       background: white;
@@ -217,21 +201,6 @@
     .document {
       box-shadow: none;
       border-radius: 0;
-    }
-    .dates {
-      background: #0a0a0a;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    th {
-      background: #0a0a0a;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    .total-geral {
-      background: #0a0a0a;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
     }
   }
 </style>
@@ -243,7 +212,6 @@
   </div>
 
   <div class="body">
-    <!-- INFORMAÇÕES DA EMPRESA -->
     <div class="company-info">
       {{#if companyLogo}}
         <img src="{{companyLogo}}" class="logo" alt="Logo">
@@ -254,7 +222,6 @@
       <p>{{companyAddress}}</p>
     </div>
 
-    <!-- DADOS DO CLIENTE -->
     <div class="client-box">
       <h3>DADOS DO CLIENTE</h3>
       <div class="client-grid">
@@ -267,13 +234,11 @@
       </div>
     </div>
 
-    <!-- DATAS -->
     <div class="dates">
       <span>📅 Emissão: {{issueDate}}</span>
       <span>⏰ Vencimento: {{dueDate}}</span>
     </div>
 
-    <!-- TABELA DE ITENS -->
     <div class="table-wrapper">
       <table>
         <thead>
@@ -281,9 +246,9 @@
             <th>Descrição</th>
             <th class="text-right">Qtde</th>
             <th class="text-right">Valor Unit.</th>
-            <th class="text-center">ISS %</th>
-            <th class="text-right">ISS Valor</th>
-            <th class="text-right">Total c/ ISS</th>
+            <th class="text-center">ISS (%)</th>
+            <th class="text-right">Valor ISS</th>
+            <th class="text-right">Total com ISS</th>
           </tr>
         </thead>
         <tbody>
@@ -301,18 +266,16 @@
       </table>
     </div>
 
-    <!-- TOTAIS -->
     <div class="totals">
-      <p>💰 Subtotal (sem ISS): R$ {{subtotal}}</p>
-      <p>📊 Total de ISS: R$ {{totalIss}}</p>
+      <p>📊 Subtotal (sem ISS): R$ {{subtotal}}</p>
+      <p>💰 Total de ISS: R$ {{totalIss}}</p>
       <div class="total-geral">🎯 TOTAL GERAL: R$ {{total}}</div>
     </div>
   </div>
 
-  <!-- FOOTER -->
   <div class="footer">
     <p>{{companyName}} - {{companyPhone}} | {{companyEmail}}</p>
-    <p>📄 Esta fatura é um documento oficial. Em caso de dúvidas, entre em contato.</p>
+    <p>📄 Esta fatura é um documento oficial.</p>
   </div>
 </div>
 </body>

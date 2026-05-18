@@ -11,12 +11,18 @@ import {
   IsEnum,
 } from 'class-validator';
 
-// 🔥 BUG #55 CORRIGIDO: Definir enum para status
 export enum EstimateStatusDto {
   DRAFT = 'DRAFT',
   SENT = 'SENT',
   APPROVED = 'APPROVED',
   CONVERTED = 'CONVERTED',
+}
+
+export enum PaymentMethodDto {
+  CREDIT_CARD = 'CREDIT_CARD',
+  DEBIT_CARD = 'DEBIT_CARD',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  PIX = 'PIX',
 }
 
 export class CreateEstimateItemDto {
@@ -44,7 +50,6 @@ export class CreateEstimateDto {
   @IsNumber()
   clientId: number;
 
-  // 🔥 BUG #55 CORRIGIDO: Usar enum em vez de string livre
   @IsOptional()
   @IsEnum(EstimateStatusDto)
   status?: EstimateStatusDto;
@@ -57,4 +62,8 @@ export class CreateEstimateDto {
   @ValidateNested({ each: true })
   @Type(() => CreateEstimateItemDto)
   items: CreateEstimateItemDto[];
+
+  @IsOptional()
+  @IsEnum(PaymentMethodDto)
+  paymentMethod?: PaymentMethodDto;
 }

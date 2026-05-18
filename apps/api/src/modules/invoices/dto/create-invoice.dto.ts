@@ -17,6 +17,13 @@ export enum InvoiceStatusDto {
   CANCELED = 'CANCELED',
 }
 
+export enum PaymentMethodDto {
+  CREDIT_CARD = 'CREDIT_CARD',
+  DEBIT_CARD = 'DEBIT_CARD',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  PIX = 'PIX',
+}
+
 export class CreateInvoiceItemDto {
   @IsString()
   @IsNotEmpty()
@@ -54,4 +61,8 @@ export class CreateInvoiceDto {
   @ValidateNested({ each: true })
   @Type(() => CreateInvoiceItemDto)
   items: CreateInvoiceItemDto[];
+
+  @IsOptional()
+  @IsEnum(PaymentMethodDto)
+  paymentMethod?: PaymentMethodDto;
 }
