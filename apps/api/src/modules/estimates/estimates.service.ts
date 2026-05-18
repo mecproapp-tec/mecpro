@@ -422,10 +422,11 @@ export class EstimatesService {
     estimateId: number,
     tenantId: string,
   ) {
-    this.logger.log(`convertToInvoice ${estimateId}`);
+    this.logger.log(`🚀 convertToInvoice chamada para estimate ${estimateId}`);
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Buscar orçamento com items
         const estimate = await tx.estimate.findFirst({
           where: {
             id: estimateId,
@@ -458,8 +459,16 @@ export class EstimatesService {
           throw new BadRequestException('Orçamento sem itens');
         }
 
+        // 2. Log dos items do orçamento para debug
+        this.logger.log(`📋 Orçamento ${estimateId} tem ${estimate.items.length} itens`);
+        estimate.items.forEach((item, idx) => {
+          this.logger.log(`  Item ${idx + 1}: ${item.description}, ISS: ${item.issPercent}%`);
+        });
+
+        // 3. Gerar número da fatura
         const invoiceNumber = await this.generateInvoiceNumber(tx, tenantId);
 
+        // 4. Criar fatura com os items (copiando inclusive o issPercent)
         const invoice = await tx.invoice.create({
           data: {
             tenantId: estimate.tenantId,
@@ -476,7 +485,7 @@ export class EstimatesService {
                   quantity: item.quantity,
                   price: item.price,
                   total: item.total,
-                  issPercent: item.issPercent,
+                  issPercent: item.issPercent || 0, // ✅ Garantindo que o ISS é copiado
                 })),
               },
             },
@@ -484,9 +493,19 @@ export class EstimatesService {
           select: {
             id: true,
             number: true,
+            items: true, // Incluir items para verificar
           },
         });
 
+        // 5. Log dos items da fatura para debug
+        this.logger.log(`📄 Fatura ${invoice.number} criada com ${invoice.items?.length || 0} itens`);
+        if (invoice.items) {
+          invoice.items.forEach((item, idx) => {
+            this.logger.log(`  Item ${idx + 1}: ${item.description}, ISS: ${item.issPercent}%`);
+          });
+        }
+
+        // 6. Atualizar status do orçamento
         await tx.estimate.update({
           where: { id: estimate.id },
           data: { status: EstimateStatus.CONVERTED },
@@ -495,6 +514,8 @@ export class EstimatesService {
         return invoice;
       });
 
+      this.logger.log(`✅ Orçamento ${estimateId} convertido com sucesso para fatura ${result.number}`);
+
       return {
         success: true,
         invoiceId: result.id,
@@ -502,7 +523,7 @@ export class EstimatesService {
         invoice: result,
       };
     } catch (error: any) {
-      this.logger.error(`convertToInvoice error ${estimateId}`, error?.stack || error);
+      this.logger.error(`❌ Erro ao converter orçamento ${estimateId}`, error?.stack || error);
 
       if (
         error instanceof BadRequestException ||
@@ -513,19 +534,16 @@ export class EstimatesService {
       }
 
       if (error?.code === 'P2002') {
-        throw new ConflictException('Duplicação detectada');
+        throw new ConflictException('Número de fatura duplicado. Tente novamente.');
       }
 
-      throw new InternalServerErrorException('Erro ao converter orçamento');
+      throw new InternalServerErrorException(error?.message || 'Erro ao converter orçamento');
     }
   }
 
   /**
    * Gera número único de fatura no formato: ANO-MÊS-SEQUENCIAL
    * Exemplo: 2026-05-000001
-   * @param tx - Cliente de transação Prisma
-   * @param tenantId - ID do tenant
-   * @returns Número da fatura
    */
   private async generateInvoiceNumber(
     tx: Prisma.TransactionClient,
