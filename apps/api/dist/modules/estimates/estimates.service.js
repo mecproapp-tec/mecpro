@@ -586,4 +586,34 @@ exports.EstimatesService = EstimatesService = EstimatesService_1 = __decorate([
         estimates_pdf_service_1.EstimatesPdfService,
         storage_service_1.StorageService])
 ], EstimatesService);
+/ /;
+F;
+O;
+R;
+C;
+E;
+R;
+E;
+B;
+U;
+I;
+L;
+D;
+-;
+2;
+0;
+2;
+6;
+-;
+0;
+5;
+-;
+1;
+7;
+2;
+2;
+3;
+9;
+4;
+5;
 //# sourceMappingURL=estimates.service.js.map

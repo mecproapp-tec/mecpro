@@ -1,3 +1,4 @@
+// apps/api/src/modules/notifications/notifications.controller.ts
 import {
   Controller,
   Get,
@@ -7,11 +8,9 @@ import {
   UseGuards,
   Query,
 } from '@nestjs/common';
-
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { SessionGuard } from '../../auth/guards/session.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-
 import { NotificationsService } from './notifications.service';
 
 interface UserPayload {
@@ -24,88 +23,39 @@ interface UserPayload {
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, SessionGuard)
 export class NotificationsController {
-  constructor(
-    private readonly notificationsService: NotificationsService,
-  ) {}
+  constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  async findAll(
-    @CurrentUser() user: UserPayload,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  async findAll(@CurrentUser() user: UserPayload, @Query('page') page?: string, @Query('limit') limit?: string) {
     const result = await this.notificationsService.findAll(
       user.tenantId,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
     );
-
-    return {
-      success: true,
-      data: result.data,
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
-      totalPages: result.totalPages,
-    };
+    return { success: true, data: result.data, total: result.total, page: result.page, limit: result.limit, totalPages: result.totalPages };
   }
 
   @Post()
-  async create(
-    @Body() data: { title: string; message: string },
-    @CurrentUser() user: UserPayload,
-  ) {
-    const notification = await this.notificationsService.create(
-      user.tenantId,
-      data.title,
-      data.message,
-    );
-
-    return {
-      success: true,
-      data: notification,
-    };
+  async create(@Body() data: { title: string; message: string }, @CurrentUser() user: UserPayload) {
+    const notification = await this.notificationsService.create(user.tenantId, data.title, data.message);
+    return { success: true, data: notification };
   }
 
   @Get(':id')
-  async findOne(
-    @Param('id') id: string,
-    @CurrentUser() user: UserPayload,
-  ) {
-    const notification = await this.notificationsService.findOne(
-      Number(id),
-      user.tenantId,
-    );
-
-    return {
-      success: true,
-      data: notification,
-    };
+  async findOne(@Param('id') id: string, @CurrentUser() user: UserPayload) {
+    const notification = await this.notificationsService.findOne(Number(id), user.tenantId);
+    return { success: true, data: notification };
   }
 
   @Post(':id/mark-read')
-  async markAsRead(
-    @Param('id') id: string,
-    @CurrentUser() user: UserPayload,
-  ) {
-    const notification = await this.notificationsService.markAsRead(
-      Number(id),
-      user.tenantId,
-    );
-
-    return {
-      success: true,
-      data: notification,
-    };
+  async markAsRead(@Param('id') id: string, @CurrentUser() user: UserPayload) {
+    const notification = await this.notificationsService.markAsRead(Number(id), user.tenantId);
+    return { success: true, data: notification };
   }
 
-  // 🔥 ROTA CORRETA: /notifications/mark-all-read
   @Post('mark-all-read')
   async markAllAsRead(@CurrentUser() user: UserPayload) {
     await this.notificationsService.markAllAsRead(user.tenantId);
-
-    return {
-      success: true,
-    };
+    return { success: true };
   }
 }

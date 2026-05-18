@@ -1,3 +1,4 @@
+// apps/api/src/modules/appointments/appointments.service.ts
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../shared/prisma/prisma.service';
@@ -9,17 +10,12 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 export class AppointmentsService {
   private readonly logger = new Logger(AppointmentsService.name);
   private isCronRunning = false;
-  // 🔥 Só executa se esta instância for a responsável pelos crons
   private readonly cronEnabled = process.env.CRON_INSTANCE === 'true';
 
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
   ) {}
-
-  // ============================
-  // Métodos CRUD (mantidos)
-  // ============================
 
   async findAll(tenantId: string, page = 1, limit = 50, startDate?: string, endDate?: string) {
     const skip = (page - 1) * limit;
@@ -49,12 +45,12 @@ export class AppointmentsService {
   }
 
   async create(tenantId: string, data: CreateAppointmentDto) {
-    this.logger.log(`📅 Criando agendamento para tenant ${tenantId}, cliente ${data.clientId}`);
     const client = await this.prisma.client.findFirst({
       where: { id: data.clientId, tenantId },
     });
     if (!client) throw new BadRequestException('Cliente não encontrado');
-    return this.prisma.appointment.create({
+    
+    const appointment = await this.prisma.appointment.create({
       data: {
         tenantId,
         clientId: data.clientId,
@@ -63,6 +59,15 @@ export class AppointmentsService {
       },
       include: { client: true },
     });
+
+    await this.notificationsService.createForAppointment(
+      appointment.id,
+      tenantId,
+      'Novo agendamento',
+      `Agendamento criado para ${client.name} em ${new Date(data.date).toLocaleString('pt-BR')}`,
+    );
+
+    return appointment;
   }
 
   async update(id: number, tenantId: string, data: UpdateAppointmentDto) {
@@ -83,70 +88,36 @@ export class AppointmentsService {
     return this.prisma.appointment.delete({ where: { id } });
   }
 
-  // ============================
-  // Job automático (executa a cada minuto) – SOMENTE se CRON_INSTANCE=true
-  // ============================
-
   @Cron(CronExpression.EVERY_MINUTE)
   async checkAppointmentsForNotifications() {
-    if (!this.cronEnabled) return; // 🚫 não executa se não for a instância de cron
-
-    if (this.isCronRunning) {
-      this.logger.warn('⚠️ Cron job já está em execução. Ignorando nova chamada.');
-      return;
-    }
+    if (!this.cronEnabled) return;
+    if (this.isCronRunning) return;
     this.isCronRunning = true;
 
     try {
-      this.logger.log('🕒 Job de verificação de agendamentos executado às: ' + new Date().toLocaleString());
-
       const now = new Date();
-      const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60000);
 
       const appointments = await this.prisma.appointment.findMany({
         where: {
-          date: {
-            gte: oneMinuteAgo,
-            lte: now,
-          },
+          date: { gte: now, lte: oneHourFromNow },
         },
-        include: {
-          client: true,
-          tenant: true,
-        },
+        include: { client: true, tenant: true },
       });
 
-      this.logger.log(`Encontrados ${appointments.length} agendamento(s) para notificar.`);
-
       for (const app of appointments) {
-        if (!app.tenantId) {
-          this.logger.warn(`Agendamento ${app.id} não possui tenantId. Ignorado.`);
-          continue;
-        }
+        const minutesUntil = Math.floor((app.date.getTime() - now.getTime()) / 60000);
+        
+        let title = 'Agendamento próximo';
+        if (minutesUntil <= 15) title = 'Agendamento em 15 minutos';
+        else if (minutesUntil <= 60) title = 'Agendamento em 1 hora';
 
-        const existingNotification = await this.prisma.notification.findFirst({
-          where: {
-            appointmentId: app.id,
-            title: `🔔 Horário de agendamento: ${app.client.name}`,
-          },
-        });
-        if (existingNotification) {
-          this.logger.log(`Notificação para agendamento ${app.id} já existe. Ignorando.`);
-          continue;
-        }
+        const message = `${app.client.name} - ${app.client.vehicle || 'Veículo'} as ${app.date.toLocaleTimeString('pt-BR')}`;
 
-        const title = `🔔 Horário de agendamento: ${app.client.name}`;
-        const message = `Cliente: ${app.client.name}\nVeículo: ${app.client.vehicle || 'Não informado'} - Placa: ${app.client.plate || 'Não informada'}\nHorário: ${new Date(app.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\nEntre em contato com o cliente.`;
-
-        await this.notificationsService.createForAppointment(
-          app.id,
-          app.tenantId,
-          title,
-          message,
-        );
+        await this.notificationsService.createForAppointment(app.id, app.tenantId, title, message);
       }
     } catch (error) {
-      this.logger.error(`Erro no cron job: ${error.message}`);
+      this.logger.error(`Erro no cron: ${error.message}`);
     } finally {
       this.isCronRunning = false;
     }
