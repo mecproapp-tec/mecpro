@@ -1,3 +1,4 @@
+// apps/api/src/payments/payment.service.ts
 import {
   Injectable,
   Logger,
@@ -5,13 +6,14 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MercadoPagoConfig, PreApproval } from 'mercadopago';
+import { MercadoPagoConfig, PreApproval, Payment } from 'mercadopago';
 
 @Injectable()
 export class PaymentService implements OnModuleInit {
   private readonly logger = new Logger(PaymentService.name);
   private client: MercadoPagoConfig;
   private preApproval: PreApproval;
+  private payment: Payment;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -25,6 +27,7 @@ export class PaymentService implements OnModuleInit {
 
     this.client = new MercadoPagoConfig({ accessToken });
     this.preApproval = new PreApproval(this.client);
+    this.payment = new Payment(this.client);
 
     this.logger.log('✅ Mercado Pago inicializado com sucesso');
   }
@@ -43,7 +46,6 @@ export class PaymentService implements OnModuleInit {
 
       console.log('📦 PARAMS RECEBIDOS:', JSON.stringify(params, null, 2));
 
-      // Removido 'free_trial' por incompatibilidade de tipos no SDK
       const response = await this.preApproval.create({
         body: {
           reason: 'Plano MecPro - Oficina Mecânica',
@@ -63,7 +65,6 @@ export class PaymentService implements OnModuleInit {
       console.log('🔥 RESPOSTA COMPLETA MP:', JSON.stringify(response, null, 2));
 
       const preapprovalId = response.id;
-      // Usa apenas init_point (o SDK já retorna o link correto conforme ambiente)
       const checkoutLink = response.init_point;
 
       if (!checkoutLink) {
@@ -93,6 +94,19 @@ export class PaymentService implements OnModuleInit {
       this.logger.error(`❌ Erro ao consultar assinatura ${preapprovalId}`, error);
       console.log('🔥 ERRO CONSULTA MP:', JSON.stringify(error, null, 2));
       throw new BadRequestException('Assinatura não encontrada');
+    }
+  }
+
+  async getPayment(paymentId: string): Promise<any> {
+    try {
+      this.logger.log(`💰 Buscando pagamento: ${paymentId}`);
+      const response = await this.payment.get({ id: paymentId });
+      console.log('📄 RESPOSTA PAGAMENTO MP:', JSON.stringify(response, null, 2));
+      return response;
+    } catch (error: any) {
+      this.logger.error(`❌ Erro ao consultar pagamento ${paymentId}`, error);
+      console.log('🔥 ERRO CONSULTA PAGAMENTO MP:', JSON.stringify(error, null, 2));
+      return null;
     }
   }
 
