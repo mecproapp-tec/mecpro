@@ -103,11 +103,21 @@ export class EstimatesController {
     return this.estimatesService.update(Number(id), user.tenantId, updateDto);
   }
 
+  // ✅ CORREÇÃO AQUI - Linha 92 corrigida
   @Post(':id/convert')
   async convertToInvoice(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     if (!user?.tenantId) throw new BadRequestException('TenantId não encontrado');
-    const invoice = await this.estimatesService.convertToInvoice(Number(id), user.tenantId);
-    return { message: 'Orçamento convertido em fatura com sucesso', invoiceId: invoice.id, invoiceNumber: invoice.number, invoice };
+    
+    // O service agora retorna um objeto estruturado
+    const result = await this.estimatesService.convertToInvoice(Number(id), user.tenantId);
+    
+    // Retorno compatível com o que seu frontend espera
+    return { 
+      message: 'Orçamento convertido em fatura com sucesso', 
+      invoiceId: result.invoiceId, 
+      invoiceNumber: result.invoiceNumber, 
+      invoice: result.invoice 
+    };
   }
 
   @Delete(':id')

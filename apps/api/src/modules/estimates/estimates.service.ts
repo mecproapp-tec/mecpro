@@ -412,144 +412,97 @@ export class EstimatesService {
     );
   }
 
+  /**
+   * Converte um orçamento (estimate) em fatura (invoice)
+   * @param estimateId - ID do orçamento
+   * @param tenantId - ID do tenant
+   * @returns Fatura criada
+   */
   async convertToInvoice(
     estimateId: number,
     tenantId: string,
   ) {
-    this.logger.log(`🚀 convertToInvoice chamada para estimate ${estimateId}`);
+    this.logger.log(`convertToInvoice ${estimateId}`);
 
     try {
-      return await this.prisma.$transaction(
-        async (tx) => {
-          const estimate =
-            await tx.estimate.findFirst({
-              where: {
-                id: estimateId,
-                tenantId,
-                deletedAt: null,
+      const result = await this.prisma.$transaction(async (tx) => {
+        const estimate = await tx.estimate.findFirst({
+          where: {
+            id: estimateId,
+            tenantId,
+            deletedAt: null,
+          },
+          include: {
+            items: true,
+          },
+        });
+
+        if (!estimate) {
+          throw new NotFoundException('Orçamento não encontrado');
+        }
+
+        if (estimate.status === EstimateStatus.CONVERTED) {
+          throw new ConflictException('Orçamento já convertido');
+        }
+
+        const existingInvoice = await tx.invoice.findFirst({
+          where: { estimateId: estimate.id },
+          select: { id: true, number: true },
+        });
+
+        if (existingInvoice) {
+          throw new ConflictException('Já existe fatura vinculada');
+        }
+
+        if (!estimate.items?.length) {
+          throw new BadRequestException('Orçamento sem itens');
+        }
+
+        const invoiceNumber = await this.generateInvoiceNumber(tx, tenantId);
+
+        const invoice = await tx.invoice.create({
+          data: {
+            tenantId: estimate.tenantId,
+            clientId: estimate.clientId,
+            total: estimate.total,
+            number: invoiceNumber,
+            status: InvoiceStatus.PENDING,
+            estimateId: estimate.id,
+            pdfStatus: 'pending',
+            items: {
+              createMany: {
+                data: estimate.items.map((item) => ({
+                  description: item.description,
+                  quantity: item.quantity,
+                  price: item.price,
+                  total: item.total,
+                  issPercent: item.issPercent,
+                })),
               },
-            });
-
-          if (!estimate) {
-            throw new NotFoundException(
-              'Orçamento não encontrado',
-            );
-          }
-
-          if (
-            estimate.status ===
-            EstimateStatus.CONVERTED
-          ) {
-            throw new ConflictException(
-              'Orçamento já convertido',
-            );
-          }
-
-          const existingInvoice =
-            await tx.invoice.findFirst({
-              where: {
-                estimateId: estimate.id,
-              },
-            });
-
-          if (existingInvoice) {
-            throw new ConflictException(
-              `Já existe uma fatura vinculada (${existingInvoice.number})`,
-            );
-          }
-
-          
-const items = await tx.estimateItem.findMany({
-  where: {
-    estimateId: estimate.id,
-    // tenantId NÃO é necessário aqui porque:
-    // 1. O estimate já foi validado com tenantId
-    // 2. Os items já estão vinculados ao estimate via FK
-  },
-});
-
-          if (!items.length) {
-            throw new BadRequestException(
-              'Orçamento sem itens',
-            );
-          }
-
-          const invoiceNumber =
-            await this.generateInvoiceNumber(
-              tx,
-              tenantId,
-            );
-
-          const invoice =
-            await tx.invoice.create({
-              data: {
-                tenantId:
-                  estimate.tenantId,
-
-                clientId:
-                  estimate.clientId,
-
-                total: estimate.total,
-
-                number: invoiceNumber,
-
-                status:
-                  InvoiceStatus.PENDING,
-
-                estimateId: estimate.id,
-
-                pdfStatus: 'pending',
-
-                items: {
-                  createMany: {
-                    data: items.map(
-                      (item) => ({
-                        description:
-                          item.description,
-
-                        quantity:
-                          item.quantity,
-
-                        price: item.price,
-
-                        total: item.total,
-
-                        issPercent:
-                          item.issPercent,
-                      }),
-                    ),
-                  },
-                },
-              },
-
-              include: {
-                client: true,
-                items: true,
-              },
-            });
-
-          await tx.estimate.update({
-            where: {
-              id: estimate.id,
             },
+          },
+          select: {
+            id: true,
+            number: true,
+          },
+        });
 
-            data: {
-              status:
-                EstimateStatus.CONVERTED,
-            },
-          });
+        await tx.estimate.update({
+          where: { id: estimate.id },
+          data: { status: EstimateStatus.CONVERTED },
+        });
 
-          return invoice;
-        },
-        {
-          timeout: 30000,
-        },
-      );
+        return invoice;
+      });
+
+      return {
+        success: true,
+        invoiceId: result.id,
+        invoiceNumber: result.number,
+        invoice: result,
+      };
     } catch (error: any) {
-      this.logger.error(
-        `Erro ao converter orçamento ${estimateId}`,
-        error?.stack || error,
-      );
+      this.logger.error(`convertToInvoice error ${estimateId}`, error?.stack || error);
 
       if (
         error instanceof BadRequestException ||
@@ -559,54 +512,60 @@ const items = await tx.estimateItem.findMany({
         throw error;
       }
 
-      if (error.code === 'P2002') {
-        throw new ConflictException('Número de fatura duplicado. Tente novamente.');
+      if (error?.code === 'P2002') {
+        throw new ConflictException('Duplicação detectada');
       }
 
-      throw new InternalServerErrorException(
-        error?.message ||
-          'Erro ao converter orçamento',
-      );
+      throw new InternalServerErrorException('Erro ao converter orçamento');
     }
   }
 
+  /**
+   * Gera número único de fatura no formato: ANO-MÊS-SEQUENCIAL
+   * Exemplo: 2026-05-000001
+   * @param tx - Cliente de transação Prisma
+   * @param tenantId - ID do tenant
+   * @returns Número da fatura
+   */
   private async generateInvoiceNumber(
     tx: Prisma.TransactionClient,
     tenantId: string,
   ): Promise<string> {
-    const pad = (num: number, size: number) => String(num).padStart(size, '0');
+    const pad = (n: number, s: number) => String(n).padStart(s, '0');
+
     const now = new Date();
     const year = now.getFullYear();
     const month = pad(now.getMonth() + 1, 2);
 
-    const lastInvoice = await tx.invoice.findFirst({
+    const last = await tx.invoice.findFirst({
       where: {
         tenantId,
         number: { startsWith: `${year}-${month}` },
-        deletedAt: null,
       },
       orderBy: { number: 'desc' },
       select: { number: true },
     });
 
-    let nextSeq = 1;
-    if (lastInvoice?.number) {
-      const parts = lastInvoice.number.split('-');
-      const lastSeq = parseInt(parts[2], 10);
-      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+    let seq = 1;
+
+    if (last?.number) {
+      const parts = last.number.split('-');
+      const lastSeq = Number(parts[2]);
+      if (!isNaN(lastSeq)) seq = lastSeq + 1;
     }
 
-    const sequence = pad(nextSeq, 6);
-    const invoiceNumber = `${year}-${month}-${sequence}`;
+    const number = `${year}-${month}-${pad(seq, 6)}`;
 
     const exists = await tx.invoice.findUnique({
-      where: { number: invoiceNumber },
+      where: { number },
     });
+
     if (exists) {
-      throw new ConflictException('Falha ao gerar número único da fatura. Tente novamente.');
+      // Recursão para garantir unicidade (raro, mas seguro)
+      return this.generateInvoiceNumber(tx, tenantId);
     }
 
-    return invoiceNumber;
+    return number;
   }
 
   async remove(
