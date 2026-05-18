@@ -126,7 +126,7 @@ export class EstimatesService {
             status: EstimateStatus.DRAFT,
             date: estimateDate,
             pdfStatus: 'pending',
-
+            paymentMethod: data.paymentMethod,
             items: {
               create: items,
             },
@@ -351,6 +351,10 @@ export class EstimatesService {
           updateData.status = status;
         }
 
+        if (data.paymentMethod) {
+          updateData.paymentMethod = data.paymentMethod;
+        }
+
         let itemsChanged = false;
 
         if (
@@ -412,12 +416,6 @@ export class EstimatesService {
     );
   }
 
-  /**
-   * Converte um orçamento (estimate) em fatura (invoice)
-   * @param estimateId - ID do orçamento
-   * @param tenantId - ID do tenant
-   * @returns Fatura criada
-   */
   async convertToInvoice(
     estimateId: number,
     tenantId: string,
@@ -426,7 +424,6 @@ export class EstimatesService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        // 1. Buscar orçamento com items
         const estimate = await tx.estimate.findFirst({
           where: {
             id: estimateId,
@@ -459,16 +456,13 @@ export class EstimatesService {
           throw new BadRequestException('Orçamento sem itens');
         }
 
-        // 2. Log dos items do orçamento para debug
         this.logger.log(`📋 Orçamento ${estimateId} tem ${estimate.items.length} itens`);
         estimate.items.forEach((item, idx) => {
           this.logger.log(`  Item ${idx + 1}: ${item.description}, ISS: ${item.issPercent}%`);
         });
 
-        // 3. Gerar número da fatura
         const invoiceNumber = await this.generateInvoiceNumber(tx, tenantId);
 
-        // 4. Criar fatura com os items (copiando inclusive o issPercent)
         const invoice = await tx.invoice.create({
           data: {
             tenantId: estimate.tenantId,
@@ -478,6 +472,7 @@ export class EstimatesService {
             status: InvoiceStatus.PENDING,
             estimateId: estimate.id,
             pdfStatus: 'pending',
+            paymentMethod: estimate.paymentMethod,
             items: {
               createMany: {
                 data: estimate.items.map((item) => ({
@@ -485,7 +480,7 @@ export class EstimatesService {
                   quantity: item.quantity,
                   price: item.price,
                   total: item.total,
-                  issPercent: item.issPercent || 0, // ✅ Garantindo que o ISS é copiado
+                  issPercent: item.issPercent || 0,
                 })),
               },
             },
@@ -493,11 +488,10 @@ export class EstimatesService {
           select: {
             id: true,
             number: true,
-            items: true, // Incluir items para verificar
+            items: true,
           },
         });
 
-        // 5. Log dos items da fatura para debug
         this.logger.log(`📄 Fatura ${invoice.number} criada com ${invoice.items?.length || 0} itens`);
         if (invoice.items) {
           invoice.items.forEach((item, idx) => {
@@ -505,7 +499,6 @@ export class EstimatesService {
           });
         }
 
-        // 6. Atualizar status do orçamento
         await tx.estimate.update({
           where: { id: estimate.id },
           data: { status: EstimateStatus.CONVERTED },
@@ -541,10 +534,6 @@ export class EstimatesService {
     }
   }
 
-  /**
-   * Gera número único de fatura no formato: ANO-MÊS-SEQUENCIAL
-   * Exemplo: 2026-05-000001
-   */
   private async generateInvoiceNumber(
     tx: Prisma.TransactionClient,
     tenantId: string,
@@ -910,8 +899,10 @@ export class EstimatesService {
         ? cleanPhone
         : `55${cleanPhone}`;
 
+    const tenantName = estimate.tenant?.name || 'MecPro';
+
     const message =
-      `📄 *ORÇAMENTO #${estimate.id}*\n` +
+      `📄 *${tenantName} - ORÇAMENTO #${estimate.id}*\n` +
       `👤 Cliente: ${estimate.client?.name || '-'}\n` +
       `💰 Total: R$ ${Number(
         estimate.total,

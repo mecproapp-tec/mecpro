@@ -22,7 +22,6 @@ export class InvoicesService {
     private storageService: StorageService,
   ) {}
 
-  // 🔥 CORREÇÃO: Método calculate agora inclui ISS igual ao do orçamento
   private calculate(items: any[]) {
     let total = new Prisma.Decimal(0);
 
@@ -54,7 +53,7 @@ export class InvoicesService {
   }
 
   async create(tenantId: string, data: any) {
-    const { clientId, items: inputItems, date } = data;
+    const { clientId, items: inputItems, date, paymentMethod } = data;
     
     if (!tenantId) throw new BadRequestException('TenantId não informado');
     if (!clientId) throw new BadRequestException('Cliente não informado');
@@ -86,6 +85,7 @@ export class InvoicesService {
         total,
         status: 'PENDING',
         createdAt: invoiceDate,
+        paymentMethod,
         items: { create: items },
       },
       include: { items: true, client: true, tenant: true },
@@ -178,6 +178,7 @@ export class InvoicesService {
     const updateData: any = {};
     if (data.clientId !== undefined) updateData.clientId = data.clientId;
     if (data.status !== undefined) updateData.status = data.status as InvoiceStatus;
+    if (data.paymentMethod !== undefined) updateData.paymentMethod = data.paymentMethod;
     return this.prisma.invoice.update({
       where: { id },
       data: updateData,
@@ -223,7 +224,15 @@ export class InvoicesService {
     }
     const finalPhone = cleanPhone.length === 10 ? `55${cleanPhone}` : (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`);
 
-    const message = `📄 *FATURA MECPRO #${invoice.number}*\n👤 *Cliente:* ${invoice.client?.name || '-'}\n🚗 *Veículo:* ${invoice.client?.vehicle || '-'}\n💰 *Total:* R$ ${Number(invoice.total).toFixed(2)}\n🔗 *Link:* ${shareUrl}\n${invoice.tenant?.name || 'MecPro'} - Gestão para Oficinas`;
+    const tenantName = invoice.tenant?.name || 'MecPro';
+
+    const message = 
+      `📄 *${tenantName} - FATURA #${invoice.number}*\n` +
+      `👤 *Cliente:* ${invoice.client?.name || '-'}\n` +
+      `🚗 *Veículo:* ${invoice.client?.vehicle || '-'}\n` +
+      `💰 *Total:* R$ ${Number(invoice.total).toFixed(2)}\n` +
+      `🔗 *Link:* ${shareUrl}\n` +
+      `${tenantName} - Gestão para Oficinas`;
 
     const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
 
