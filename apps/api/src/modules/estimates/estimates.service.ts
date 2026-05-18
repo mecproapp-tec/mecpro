@@ -458,12 +458,15 @@ export class EstimatesService {
             );
           }
 
-          // CORREÇÃO: buscar itens sem tenantId (campo não existe no modelo)
-          const items = await tx.estimateItem.findMany({
-            where: {
-              estimateId: estimate.id,
-            },
-          });
+          
+const items = await tx.estimateItem.findMany({
+  where: {
+    estimateId: estimate.id,
+    // tenantId NÃO é necessário aqui porque:
+    // 1. O estimate já foi validado com tenantId
+    // 2. Os items já estão vinculados ao estimate via FK
+  },
+});
 
           if (!items.length) {
             throw new BadRequestException(
