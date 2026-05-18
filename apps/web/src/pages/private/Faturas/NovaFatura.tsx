@@ -5,7 +5,7 @@ import { getClients } from "../../../services/clients";
 import type { Client } from "../../../services/clients";
 import type { Estimate } from "../../../services/Estimates";
 import { createInvoice, updateInvoice, getInvoiceById } from "../../../services/invoices";
-import type { InvoiceItem, CreateInvoiceData } from "../../../services/invoices";
+import type { InvoiceItem } from "../../../services/invoices";
 
 export default function NovaFatura() {
   const navigate = useNavigate();
@@ -22,22 +22,20 @@ export default function NovaFatura() {
     { description: "", quantity: 1, price: 0, issPercent: undefined },
   ]);
   const [status, setStatus] = useState<"PENDING" | "PAID" | "CANCELED">("PENDING");
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Carrega lista de clientes
   useEffect(() => {
     carregarClientes();
   }, []);
 
-  // Carrega fatura para edição (executa quando clientes estiverem disponíveis)
   useEffect(() => {
     if (isEditing && clientes.length > 0) {
       carregarFatura();
     }
   }, [id, clientes.length]);
 
-  // Preenche itens a partir de um orçamento
   useEffect(() => {
     if (estimateFromState && clientes.length > 0) {
       const cliente = clientes.find((c) => c.id === estimateFromState.clientId);
@@ -52,7 +50,6 @@ export default function NovaFatura() {
     }
   }, [estimateFromState, clientes]);
 
-  // 🔥 CORREÇÃO: Garantir que clientes é array
   const carregarClientes = async () => {
     try {
       const data = await getClients();
@@ -75,6 +72,7 @@ export default function NovaFatura() {
         issPercent,
       })));
       setStatus(fatura.status);
+      setPaymentMethod(fatura.paymentMethod || "");
     } catch (err: any) {
       setError(err.response?.data?.message || "Erro ao carregar fatura");
     }
@@ -104,13 +102,11 @@ export default function NovaFatura() {
     setItens(novos);
   };
 
-  // Calcula o total de um item com ISS
   const calcularTotalItem = (item: typeof itens[0]) => {
     const iss = item.issPercent ? item.price * (item.issPercent / 100) : 0;
     return (item.price + iss) * item.quantity;
   };
 
-  // Total geral calculado corretamente
   const totalGeral = itens.reduce((acc, item) => acc + calcularTotalItem(item), 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -129,6 +125,7 @@ export default function NovaFatura() {
         issPercent: issPercent || 0,
       })),
       status,
+      paymentMethod: paymentMethod || undefined,
     };
 
     try {
@@ -145,7 +142,6 @@ export default function NovaFatura() {
     }
   };
 
-  // 🔥 CORREÇÃO: Verificar se clientes é array antes de filter
   const clientesFiltrados = Array.isArray(clientes) && clientes.length > 0
     ? clientes.filter(
         (c) =>
@@ -165,7 +161,6 @@ export default function NovaFatura() {
       }}
     >
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-        {/* Cabeçalho */}
         <div style={{ display: "flex", alignItems: "center", marginBottom: "40px" }}>
           <button
             onClick={() => navigate("/faturas")}
@@ -204,7 +199,6 @@ export default function NovaFatura() {
           </h1>
         </div>
 
-        {/* Formulário */}
         <div
           style={{
             background: "#111",
@@ -229,7 +223,6 @@ export default function NovaFatura() {
           )}
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-            {/* Cliente */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Cliente (nome ou placa)
@@ -338,7 +331,6 @@ export default function NovaFatura() {
               )}
             </div>
 
-            {/* Status */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Status
@@ -363,7 +355,32 @@ export default function NovaFatura() {
               </select>
             </div>
 
-            {/* Itens */}
+            <div>
+              <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
+                Forma de Pagamento
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "16px",
+                  borderRadius: "16px",
+                  border: "1px solid #333",
+                  background: "#1a1a1a",
+                  color: "#fff",
+                  fontSize: "16px",
+                  outline: "none",
+                }}
+              >
+                <option value="">Selecione</option>
+                <option value="CREDIT_CARD">Cartão de Crédito</option>
+                <option value="DEBIT_CARD">Cartão de Débito</option>
+                <option value="BANK_TRANSFER">Transferência Bancária</option>
+                <option value="PIX">PIX</option>
+              </select>
+            </div>
+
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Itens da Fatura
@@ -512,12 +529,10 @@ export default function NovaFatura() {
               </button>
             </div>
 
-            {/* Total calculado */}
             <div style={{ textAlign: "right", fontSize: "28px", fontWeight: "700", color: "#00e5ff" }}>
               Total: R$ {totalGeral.toFixed(2)}
             </div>
 
-            {/* Botão submit */}
             <button
               type="submit"
               disabled={loading || !clienteSelecionado}

@@ -1,4 +1,3 @@
-// apps/web/src/pages/private/Faturas/Faturas.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -31,6 +30,16 @@ const getStatusColor = (status: string): string => {
     case "PENDING":  return "#ffaa00";
     case "CANCELED": return "#ff4444";
     default:         return "#ffffff";
+  }
+};
+
+const getPaymentMethodLabel = (method?: string): string => {
+  switch (method) {
+    case 'CREDIT_CARD': return 'Cartão Crédito';
+    case 'DEBIT_CARD': return 'Cartão Débito';
+    case 'BANK_TRANSFER': return 'Transferência';
+    case 'PIX': return 'PIX';
+    default: return '—';
   }
 };
 
@@ -180,13 +189,11 @@ export default function Faturas() {
       if (!phoneNumber) return;
     }
 
-    // Remove tudo que não é dígito e remove possível "55" no início
     let telefone = phoneNumber.replace(/\D/g, '');
     if (telefone.startsWith('55')) {
       telefone = telefone.slice(2);
     }
 
-    // Validação: 10 ou 11 dígitos
     if (telefone.length !== 10 && telefone.length !== 11) {
       toast.error('Número inválido. Use DDD + número (ex.: 21999999999)');
       return;
@@ -313,6 +320,7 @@ export default function Faturas() {
                   <th style={styles.th}>Placa</th>
                   <th style={styles.th}>Data</th>
                   <th style={styles.th}>Total (R$)</th>
+                  <th style={styles.th}>Pagamento</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Ações</th>
                 </tr>
@@ -329,6 +337,7 @@ export default function Faturas() {
                       <td style={styles.td}>{cliente?.plate || ""}</td>
                       <td style={styles.td}>{new Date(f.createdAt).toLocaleDateString("pt-BR")}</td>
                       <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>R$ {totalComIss.toFixed(2)}</td>
+                      <td style={styles.td}>{getPaymentMethodLabel(f.paymentMethod)}</td>
                       <td style={styles.td}>
                         <select
                           value={f.status}
@@ -339,7 +348,7 @@ export default function Faturas() {
                           <option value="PAID">Paga</option>
                           <option value="CANCELED">Cancelada</option>
                         </select>
-                       </td>
+                      </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
                           <button onClick={() => navigate(`/clientes/ver/${f.clientId}`)} style={styles.actionButton} title="Ver cliente">
@@ -355,13 +364,13 @@ export default function Faturas() {
                             <FiMessageCircle size={16} />
                           </button>
                         </div>
-                       </td>
+                      </td>
                     </tr>
                   );
                 })}
                 {faturasFiltradas.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={styles.emptyRow}>Nenhuma fatura encontrada.</td>
+                    <td colSpan={9} style={styles.emptyRow}>Nenhuma fatura encontrada.</td>
                   </tr>
                 )}
               </tbody>

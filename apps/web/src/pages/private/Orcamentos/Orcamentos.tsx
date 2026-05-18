@@ -42,6 +42,16 @@ function getStatusLabel(status: string): string {
   return displayStatusMap[status] || status;
 }
 
+function getPaymentMethodLabel(method?: string): string {
+  switch (method) {
+    case 'CREDIT_CARD': return 'Cartão Crédito';
+    case 'DEBIT_CARD': return 'Cartão Débito';
+    case 'BANK_TRANSFER': return 'Transferência';
+    case 'PIX': return 'PIX';
+    default: return '—';
+  }
+}
+
 export default function Orcamentos() {
   const navigate = useNavigate();
   const [orcamentos, setOrcamentos] = useState<Estimate[]>([]);
@@ -78,6 +88,7 @@ export default function Orcamentos() {
         status: reverseStatusMap[est.status] || est.status,
         items: est.items || [],
         total: typeof est.total === 'string' ? parseFloat(est.total) : (est.total || 0),
+        paymentMethod: est.paymentMethod,
       }));
       
       setOrcamentos(convertedEstimates);
@@ -136,19 +147,17 @@ export default function Orcamentos() {
     }
   };
 
-  // 🔥 FUNÇÃO CORRIGIDA: envia SOMENTE o status (PATCH parcial)
   const handleStatusChange = async (orcamento: Estimate, novoStatus: "accepted" | "pending") => {
     if (!orcamento.clientId) {
       toast.error("Cliente inválido para este orçamento.");
       return;
     }
 
-    // Evita requisição desnecessária se o status já é o mesmo
     if (orcamento.status === novoStatus) return;
 
     try {
       const payload = {
-        status: statusMap[novoStatus], // "APPROVED" ou "DRAFT"
+        status: statusMap[novoStatus],
       };
 
       await updateEstimate(orcamento.id, payload);
@@ -386,6 +395,7 @@ export default function Orcamentos() {
                   <th style={styles.th}>Placa</th>
                   <th style={styles.th}>Data</th>
                   <th style={styles.th}>Total (R$)</th>
+                  <th style={styles.th}>Pagamento</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Ações</th>
                 </tr>
@@ -400,6 +410,7 @@ export default function Orcamentos() {
                       <td style={styles.td}>{cliente?.plate || ""}</td>
                       <td style={styles.td}>{new Date(o.date).toLocaleDateString("pt-BR")}</td>
                       <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>R$ {Number(o.total).toFixed(2)}</td>
+                      <td style={styles.td}>{getPaymentMethodLabel(o.paymentMethod)}</td>
                       <td style={styles.td}>
                         {o.status === "converted" ? (
                           <span style={styles.convertedStatus}>{getStatusLabel(o.status)}</span>
@@ -449,7 +460,7 @@ export default function Orcamentos() {
                 })}
                 {orcamentosFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={styles.emptyRow}>Nenhum orçamento encontrado.</td>
+                    <td colSpan={8} style={styles.emptyRow}>Nenhum orçamento encontrado.</td>
                   </tr>
                 )}
               </tbody>
