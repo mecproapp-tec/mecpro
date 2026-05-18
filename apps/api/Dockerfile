@@ -1,3 +1,5 @@
+# Criar o Dockerfile corrigido
+@'
 FROM node:20-slim AS builder
 
 WORKDIR /app
@@ -30,18 +32,17 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia SOMENTE o app correto (monorepo seguro)
-COPY apps/api/package*.json ./
-COPY apps/api/prisma ./prisma
+# Copia arquivos (já estamos dentro de apps/api)
+COPY package*.json ./
+COPY prisma ./prisma
 
 RUN npm install
 
-# Agora sim copia o código certo
-COPY apps/api ./
+# Copia o código fonte
+COPY . .
 
 RUN npx prisma generate
 RUN npm run build
-
 
 # =========================
 # PRODUÇÃO
@@ -55,14 +56,16 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia apenas o necessário do build
+# Copia apenas o necessário do builder
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV NODE_ENV=production
 
 EXPOSE 3000
 
 CMD ["node", "dist/main.js"]
+'@ | Out-File -FilePath "C:\Users\admco\OneDrive\Escritorio\MecPro\apps\api\Dockerfile" -Encoding UTF8
