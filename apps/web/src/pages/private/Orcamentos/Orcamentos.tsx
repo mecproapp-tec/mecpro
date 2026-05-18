@@ -136,35 +136,37 @@ export default function Orcamentos() {
     }
   };
 
+  // ========== FUNÇÃO handleStatusChange CORRIGIDA ==========
   const handleStatusChange = async (orcamento: Estimate, novoStatus: "accepted" | "pending") => {
-    if (!orcamento.clientId || typeof orcamento.clientId !== 'number' || orcamento.clientId <= 0) {
-      toast.error("Este orçamento não possui um cliente válido.");
+    if (!orcamento.clientId) {
+      toast.error("Cliente inválido para este orçamento.");
       return;
     }
 
+    // Evita requisição desnecessária se o status já for o mesmo
+    if (orcamento.status === novoStatus) return;
+
     try {
+      // Envia SOMENTE o status (PATCH parcial)
       const payload = {
-        clientId: orcamento.clientId,
-        date: orcamento.date,
-        items: orcamento.items.map(item => ({
-          description: item.description,
-          quantity: item.quantity || 1,
-          price: item.price,
-          issPercent: item.issPercent || 0,
-        })),
-        status: statusMap[novoStatus],
+        status: statusMap[novoStatus], // "APPROVED" ou "DRAFT"
       };
+
       await updateEstimate(orcamento.id, payload);
+
+      // Atualiza estado local
       setOrcamentos(prev =>
         prev.map(o => (o.id === orcamento.id ? { ...o, status: novoStatus } : o))
       );
+
       toast.success(`Status alterado para ${getStatusLabel(novoStatus)}`);
     } catch (err: any) {
+      console.error("Erro no updateStatus:", err);
       toast.error(err.response?.data?.message || "Erro ao alterar status");
     }
   };
+  // ========== FIM DA CORREÇÃO ==========
 
-  // ========== FUNÇÃO handleConverter CORRIGIDA ==========
   const handleConverter = async (orcamento: Estimate) => {
     if (convertingIds.has(orcamento.id)) {
       toast.error("Este orçamento já está sendo convertido. Aguarde...");
@@ -236,7 +238,6 @@ export default function Orcamentos() {
       });
     }
   };
-  // ========== FIM DA CORREÇÃO ==========
 
   const handleWhatsApp = async (item: Estimate, tipo: 'estimate' | 'invoice') => {
     const cliente = item.client;
@@ -390,7 +391,7 @@ export default function Orcamentos() {
                   <th style={styles.th}>Total (R$)</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Ações</th>
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 {orcamentosFiltrados.map((o, index) => {
