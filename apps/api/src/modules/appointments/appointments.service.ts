@@ -60,13 +60,6 @@ export class AppointmentsService {
       include: { client: true },
     });
 
-    await this.notificationsService.createForAppointment(
-      appointment.id,
-      tenantId,
-      'Novo agendamento',
-      `Agendamento criado para ${client.name} em ${new Date(data.date).toLocaleString('pt-BR')}`,
-    );
-
     return appointment;
   }
 
@@ -96,14 +89,11 @@ export class AppointmentsService {
 
     try {
       const now = new Date();
-      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60000);
-      const sixMinutesFromNow = new Date(now.getTime() + 6 * 60000);
-
+      
       const appointments = await this.prisma.appointment.findMany({
         where: {
           date: {
-            gte: fiveMinutesFromNow,
-            lte: sixMinutesFromNow,
+            gte: new Date(),
           },
         },
         include: {
@@ -113,15 +103,32 @@ export class AppointmentsService {
       });
 
       for (const app of appointments) {
-        const title = 'Agendamento em 5 minutos';
-        const message = `${app.client.name} - ${app.client.vehicle || 'Veículo'} as ${app.date.toLocaleTimeString('pt-BR')}`;
+        const appointmentTime = new Date(app.date);
+        const diffMs = appointmentTime.getTime() - now.getTime();
+        const diffMinutes = Math.floor(diffMs / 60000);
+        
+        const shouldNotify = diffMinutes <= 5 && diffMinutes >= 0;
+        
+        const existingNotification = await this.prisma.notification.findFirst({
+          where: {
+            appointmentId: app.id,
+            title: 'Lembrete: Agendamento em 5 minutos',
+          },
+        });
 
-        await this.notificationsService.createForAppointment(
-          app.id,
-          app.tenantId,
-          title,
-          message,
-        );
+        if (shouldNotify && !existingNotification) {
+          const title = 'Lembrete: Agendamento em 5 minutos';
+          const message = `${app.client.name} - ${app.client.vehicle || 'Veículo'} as ${appointmentTime.toLocaleTimeString('pt-BR')}`;
+
+          await this.notificationsService.createForAppointment(
+            app.id,
+            app.tenantId,
+            title,
+            message,
+          );
+          
+          this.logger.log(`Notificação criada para agendamento ${app.id} faltando ${diffMinutes} minutos`);
+        }
       }
     } catch (error) {
       this.logger.error(`Erro no cron: ${error.message}`);
