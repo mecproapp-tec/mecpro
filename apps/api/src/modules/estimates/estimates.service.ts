@@ -561,7 +561,6 @@ export class EstimatesService {
     });
 
     if (exists) {
-      // Recursão para garantir unicidade (raro, mas seguro)
       return this.generateInvoiceNumber(tx, tenantId);
     }
 
@@ -911,3 +910,4 @@ export class EstimatesService {
       phoneNumber: finalPhone,
     };
   }
+}
