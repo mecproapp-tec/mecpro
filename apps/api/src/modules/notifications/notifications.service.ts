@@ -90,7 +90,7 @@ export class NotificationsService {
     return { success: true };
   }
 
-  // 🔥 NOVO MÉTODO: excluir todas as notificações lidas do tenant
+  
   async deleteAllRead(tenantId: string) {
     const result = await this.prisma.notification.deleteMany({
       where: { tenantId, read: true },

@@ -21,6 +21,14 @@ interface CreateEstimateData {
   paymentMethod?: string;
 }
 
+// Função auxiliar para obter data local no formato YYYY-MM-DD
+function getLocalDateString(date: Date = new Date()): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function NovoOrcamento() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -32,9 +40,8 @@ export default function NovoOrcamento() {
   const [itens, setItens] = useState<Omit<EstimateItem, "total">[]>([
     { description: "", quantity: 1, price: 0, issPercent: undefined },
   ]);
-  const [dataOrcamento, setDataOrcamento] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  // CORREÇÃO: usar getLocalDateString() em vez de toISOString()
+  const [dataOrcamento, setDataOrcamento] = useState(getLocalDateString());
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -71,8 +78,9 @@ export default function NovoOrcamento() {
           issPercent: item.issPercent !== undefined && item.issPercent !== null ? Number(item.issPercent) : undefined,
         }))
       );
+      // CORREÇÃO: também usar getLocalDateString como fallback
       setDataOrcamento(
-        orcamento.date?.split("T")[0] || new Date().toISOString().split("T")[0]
+        orcamento.date?.split("T")[0] || getLocalDateString()
       );
       setPaymentMethod(orcamento.paymentMethod || "");
     } catch (err: any) {

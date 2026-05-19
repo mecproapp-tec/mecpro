@@ -161,6 +161,7 @@ export default function NovaFatura() {
       }}
     >
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+        {/* Header com ícone e título - mesmo espaçamento do orçamento */}
         <div style={{ display: "flex", alignItems: "center", marginBottom: "40px" }}>
           <button
             onClick={() => navigate("/faturas")}
@@ -199,6 +200,7 @@ export default function NovaFatura() {
           </h1>
         </div>
 
+        {/* Card principal - mesmo padding e bordas do orçamento */}
         <div
           style={{
             background: "#111",
@@ -223,6 +225,7 @@ export default function NovaFatura() {
           )}
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+            {/* Campo Cliente - mesmo estilo do orçamento */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Cliente (nome ou placa)
@@ -331,6 +334,7 @@ export default function NovaFatura() {
               )}
             </div>
 
+            {/* Status - mesmo espaçamento vertical */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Status
@@ -348,6 +352,8 @@ export default function NovaFatura() {
                   fontSize: "16px",
                   outline: "none",
                 }}
+                onFocus={(e) => (e.target.style.borderColor = "#00e5ff")}
+                onBlur={(e) => (e.target.style.borderColor = "#333")}
               >
                 <option value="PENDING">Pendente</option>
                 <option value="PAID">Paga</option>
@@ -355,6 +361,7 @@ export default function NovaFatura() {
               </select>
             </div>
 
+            {/* Forma de Pagamento */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Forma de Pagamento
@@ -372,6 +379,8 @@ export default function NovaFatura() {
                   fontSize: "16px",
                   outline: "none",
                 }}
+                onFocus={(e) => (e.target.style.borderColor = "#00e5ff")}
+                onBlur={(e) => (e.target.style.borderColor = "#333")}
               >
                 <option value="">Selecione</option>
                 <option value="CREDIT_CARD">Cartão de Crédito</option>
@@ -381,6 +390,7 @@ export default function NovaFatura() {
               </select>
             </div>
 
+            {/* Itens da Fatura - mesmo layout do orçamento */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Itens da Fatura
@@ -529,10 +539,12 @@ export default function NovaFatura() {
               </button>
             </div>
 
+            {/* Total - mesmo tamanho e cor */}
             <div style={{ textAlign: "right", fontSize: "28px", fontWeight: "700", color: "#00e5ff" }}>
               Total: R$ {totalGeral.toFixed(2)}
             </div>
 
+            {/* Botão submit - mesma altura, padding e efeitos */}
             <button
               type="submit"
               disabled={loading || !clienteSelecionado}
