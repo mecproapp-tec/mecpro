@@ -321,7 +321,7 @@ export default function Orcamentos() {
     }
   };
 
-  // 🔥 FILTRO LOCAL: aplica o status correto para os filtros "todos", "pending", "accepted"
+  // Filtro local
   const orcamentosFiltrados = (() => {
     if (filtro === "converted") {
       return orcamentos;
@@ -423,8 +423,11 @@ export default function Orcamentos() {
                       <td style={styles.td}>{cliente?.name || "Cliente não encontrado"}</td>
                       <td style={styles.td}>{cliente?.vehicle || "Não informado"}</td>
                       <td style={styles.td}>{cliente?.plate || ""}</td>
-                      <td style={styles.td}>{new Date(o.date).toLocaleDateString("pt-BR")}</td>
-                      <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>R$ {Number(o.total).toFixed(2)}</td>
+                      {/* ✅ CORREÇÃO: exibir data diretamente sem conversão para Date */}
+                      <td style={styles.td}>{o.date?.split('-').reverse().join('/') || ''}</td>
+                      <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>
+                        R$ {Number(o.total).toFixed(2)}
+                      </td>
                       <td style={styles.td}>{getPaymentMethodLabel(o.paymentMethod)}</td>
                       <td style={styles.td}>
                         {isConverted ? (
@@ -439,7 +442,7 @@ export default function Orcamentos() {
                             <option value="pending">Pendente</option>
                           </select>
                         )}
-                      </td>
+                       </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
                           <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={styles.actionButton} title="Ver cliente">
