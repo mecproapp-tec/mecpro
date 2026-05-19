@@ -138,7 +138,7 @@ export default function Orcamentos() {
 
   useEffect(() => {
     carregarDados();
-  }, [filtro]); // recarrega quando o filtro muda
+  }, [filtro]);
 
   const handleExcluir = async (id: number) => {
     const confirmar = confirm("Tem certeza que deseja excluir este orçamento?");
@@ -321,8 +321,7 @@ export default function Orcamentos() {
     }
   };
 
-  // Os orçamentos já vêm filtrados pelo backend, então orcamentosFiltrados é o próprio estado
-  const orcamentosFiltrados = orcamentos;
+  const orcamentosFiltrados = orcamentos; // filtro já aplicado no backend
   const totalGeral = orcamentos
     .filter(o => o.status !== "converted")
     .reduce((acc, o) => acc + Number(o.total), 0);
@@ -454,7 +453,7 @@ export default function Orcamentos() {
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    <tr>
                   );
                 })}
                 {orcamentosFiltrados.length === 0 && (
