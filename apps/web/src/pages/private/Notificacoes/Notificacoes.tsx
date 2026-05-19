@@ -8,13 +8,19 @@ export default function Notificacoes() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const carregar = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const data = await getNotifications();
-      setNotifications(data);
-    } catch (error) {
-      console.error("Erro ao carregar notificações", error);
+      // 🔥 Garante que seja array
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error("Erro ao carregar notificações", err);
+      setError("Erro ao carregar notificações. Tente novamente.");
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -25,16 +31,24 @@ export default function Notificacoes() {
   }, []);
 
   const handleMarkAsRead = async (id: number) => {
-    await markAsRead(id);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    window.dispatchEvent(new CustomEvent("notificationCountUpdated"));
+    try {
+      await markAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      window.dispatchEvent(new CustomEvent("notificationCountUpdated"));
+    } catch (err) {
+      toast.error("Erro ao marcar como lida");
+    }
   };
 
   const handleMarkAllAsRead = async () => {
-    await markAllAsRead();
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    window.dispatchEvent(new CustomEvent("notificationCountUpdated"));
-    toast.success("Todas notificações marcadas como lidas");
+    try {
+      await markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      window.dispatchEvent(new CustomEvent("notificationCountUpdated"));
+      toast.success("Todas notificações marcadas como lidas");
+    } catch (err) {
+      toast.error("Erro ao marcar todas como lidas");
+    }
   };
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
@@ -45,7 +59,7 @@ export default function Notificacoes() {
       setNotifications(prev => prev.filter(n => n.id !== id));
       window.dispatchEvent(new CustomEvent("notificationCountUpdated"));
       toast.success("Notificação excluída");
-    } catch (error) {
+    } catch (err) {
       toast.error("Erro ao excluir notificação");
     }
   };
@@ -62,17 +76,22 @@ export default function Notificacoes() {
       setNotifications(prev => prev.filter(n => !n.read));
       window.dispatchEvent(new CustomEvent("notificationCountUpdated"));
       toast.success(`${result.count} notificações lidas excluídas`);
-    } catch (error) {
+    } catch (err) {
       toast.error("Erro ao excluir notificações lidas");
     }
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR') + ', ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR') + ', ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return dateString;
+    }
   };
 
   if (loading) return <div style={styles.loading}>Carregando...</div>;
+  if (error) return <div style={styles.error}>{error}</div>;
 
   const hasUnread = notifications.some(n => !n.read);
   const hasRead = notifications.some(n => n.read);
@@ -245,5 +264,10 @@ const styles = {
     textAlign: "center",
     padding: "50px",
     color: "#00e5ff",
+  },
+  error: {
+    textAlign: "center",
+    padding: "50px",
+    color: "#ff4444",
   },
 };

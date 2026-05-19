@@ -81,6 +81,12 @@ export class AuthController {
     return this.authService.login(body.email, body.password, req);
   }
 
+  @Public()
+  @Post('super-admin/login')
+  async superAdminLogin(@Body() body: LoginDto) {
+    return this.authService.superAdminLogin(body.email, body.password);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
@@ -101,7 +107,6 @@ export class AuthController {
     };
   }
 
-  // 🔥 NOVA ROTA
   @Public()
   @Post('complete-registration')
   @HttpCode(HttpStatus.OK)

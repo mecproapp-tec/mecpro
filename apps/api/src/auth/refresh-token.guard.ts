@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../shared/prisma/prisma.service';
+import { PrismaService } from '../../shared/prisma/prisma.service';
 
 @Injectable()
 export class RefreshTokenGuard implements CanActivate {
@@ -13,20 +13,24 @@ export class RefreshTokenGuard implements CanActivate {
 
     try {
       const payload = this.jwtService.verify(token);
-      
-      // 🔥 BUG #48 CORRIGIDO: Não converter para Number, usar string diretamente
-      // O campo 'sub' no JWT é string, e o User.id no Prisma é Int
-      // O Prisma aceita string para Int automaticamente
-      const userId = typeof payload.sub === 'string' ? parseInt(payload.sub, 10) : payload.sub;
-      
-      if (isNaN(userId)) {
-        throw new UnauthorizedException('ID de usuário inválido');
+
+      if (payload.sub && typeof payload.sub === 'string' && payload.sub.startsWith('sa_')) {
+        const superAdminId = payload.sub.substring(3);
+        const superAdmin = await this.prisma.superAdmin.findUnique({
+          where: { id: superAdminId },
+        });
+        if (!superAdmin) throw new UnauthorizedException('Super Admin não encontrado');
+        req.user = { id: superAdmin.id, email: superAdmin.email, isSuperAdmin: true };
+        return true;
       }
-      
-      const user = await this.prisma.user.findUnique({ 
-        where: { id: userId } 
+
+      const userId = typeof payload.sub === 'string' ? parseInt(payload.sub, 10) : payload.sub;
+      if (isNaN(userId)) throw new UnauthorizedException('ID de usuário inválido');
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
       });
-      
+
       if (!user) throw new UnauthorizedException('Usuário não encontrado');
       req.user = user;
       return true;

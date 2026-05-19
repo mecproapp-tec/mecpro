@@ -16,14 +16,13 @@ import {
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { SessionGuard } from '../../auth/guards/session.guard';
-import { RolesGuard } from '../../auth/roles.guard';
-import { Roles } from '../../auth/roles.decorator';
+import { AdminGlobalGuard } from '../../common/guards/admin-global.guard';
+import { SuperAdminOnlyGuard } from '../../common/guards/super-admin-only.guard';
 import { AdminService } from './admin.service';
 import { TenantStatus } from '@prisma/client';
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard, SessionGuard, RolesGuard)
-@Roles('SUPER_ADMIN')
+@UseGuards(JwtAuthGuard, SessionGuard, AdminGlobalGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -58,7 +57,6 @@ export class AdminController {
     return this.adminService.getFinancialSummary(query);
   }
 
-  // ==================== CLIENTES ====================
   @Get('clients')
   async getAllClients(@Req() req: Request, @Query() query: any) {
     return this.adminService.getAllClients((req as any).user, query);
@@ -87,7 +85,6 @@ export class AdminController {
     return this.adminService.sendMessageToClient(Number(id), body);
   }
 
-  // ==================== ORÇAMENTOS ====================
   @Get('estimates')
   async getAllEstimates(@Req() req: Request, @Query() query: any) {
     return this.adminService.getAllEstimates((req as any).user, query);
@@ -103,7 +100,6 @@ export class AdminController {
     res.send(pdfBuffer);
   }
 
-  // ==================== FATURAS ====================
   @Get('invoices')
   async getAllInvoices(@Req() req: Request, @Query() query: any) {
     return this.adminService.getAllInvoices((req as any).user, query);
@@ -119,7 +115,6 @@ export class AdminController {
     res.send(pdfBuffer);
   }
 
-  // ==================== USUÁRIOS ====================
   @Get('users')
   async getAllUsers(@Query() query: any) {
     return this.adminService.getAllUsers(query);
@@ -135,7 +130,6 @@ export class AdminController {
     return this.adminService.activateUser(Number(id));
   }
 
-  // ==================== NOTIFICAÇÕES ====================
   @Post('notifications/send')
   async sendNotification(@Body() body: any) {
     return this.adminService.sendNotification(body);
@@ -167,7 +161,6 @@ export class AdminController {
     await this.adminService.deleteNotification(Number(id));
   }
 
-  // ==================== MENSAGENS DE CONTATO ====================
   @Get('contact')
   async getAllContactMessages(@Query() query: any) {
     return this.adminService.getAllContactMessages(query);
@@ -185,5 +178,23 @@ export class AdminController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteContactMessage(@Param('id') id: string) {
     await this.adminService.deleteContactMessage(Number(id));
+  }
+
+  @Get('global-admins')
+  @UseGuards(SuperAdminOnlyGuard)
+  async listGlobalAdmins() {
+    return this.adminService.listGlobalAdmins();
+  }
+
+  @Post('global-admins')
+  @UseGuards(SuperAdminOnlyGuard)
+  async createGlobalAdmin(@Body() body: { email: string; name: string; password: string }) {
+    return this.adminService.createGlobalAdmin(body);
+  }
+
+  @Delete('global-admins/:id')
+  @UseGuards(SuperAdminOnlyGuard)
+  async deleteGlobalAdmin(@Param('id') id: number) {
+    return this.adminService.deleteGlobalAdmin(id);
   }
 }

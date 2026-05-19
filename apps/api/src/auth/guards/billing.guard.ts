@@ -9,9 +9,8 @@ import { PrismaService } from '../../shared/prisma/prisma.service';
 
 @Injectable()
 export class BillingGuard implements CanActivate {
-  // 🔥 BUG #51: Cache simples para evitar consultas repetidas
   private cache = new Map<string, { data: any; expiresAt: number }>();
-  private readonly CACHE_TTL = 30000; // 30 segundos
+  private readonly CACHE_TTL = 30000;
 
   constructor(private prisma: PrismaService) {}
 
@@ -38,22 +37,24 @@ export class BillingGuard implements CanActivate {
       throw new UnauthorizedException('Usuário não autenticado');
     }
 
+    if (user.isSuperAdmin) {
+      return true;
+    }
+
+    if (user.role === 'ADMIN' && !user.tenantId) {
+      return true;
+    }
+
     if (!user.tenantId) {
       throw new UnauthorizedException('Tenant não encontrado no token');
     }
 
-    if (user.role === 'SUPER_ADMIN') {
-      return true;
-    }
-
-    // 🔥 BUG #51: Usar cache para evitar consultas repetidas ao banco
     let tenant = this.getCachedTenant(user.tenantId);
-    
+
     if (!tenant) {
       tenant = await this.prisma.tenant.findUnique({
         where: { id: user.tenantId },
       });
-      
       if (tenant) {
         this.setCachedTenant(user.tenantId, tenant);
       }
@@ -76,15 +77,9 @@ export class BillingGuard implements CanActivate {
       );
     }
 
-    // 🔥 BUG #50 CORRIGIDO: Comparação de data com fuso horário
-    if (
-      tenant.paymentStatus === 'TRIAL' &&
-      tenant.trialEndsAt
-    ) {
+    if (tenant.paymentStatus === 'TRIAL' && tenant.trialEndsAt) {
       const trialEndUTC = new Date(tenant.trialEndsAt);
       const nowUTC = new Date();
-      
-      // Comparar timestamps em UTC para evitar problemas de fuso
       if (nowUTC.getTime() > trialEndUTC.getTime()) {
         throw new ForbiddenException(
           'Seu período de teste expirou. Faça o upgrade para continuar usando o sistema.',

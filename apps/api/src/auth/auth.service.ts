@@ -1,4 +1,3 @@
-// apps/api/src/auth/auth.service.ts
 import {
   Injectable,
   UnauthorizedException,
@@ -158,40 +157,20 @@ export class AuthService {
     });
     if (existingUser) throw new BadRequestException('Email já cadastrado');
 
-    const ADMIN_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-    let tenant = await this.prisma.tenant.findUnique({
-      where: { id: ADMIN_TENANT_ID },
-    });
-    if (!tenant) {
-      tenant = await this.prisma.tenant.create({
-        data: {
-          id: ADMIN_TENANT_ID,
-          name: 'Administração',
-          documentType: 'ADMIN',
-          documentNumber: '00000000000000',
-          cep: '00000000',
-          address: 'Sistema',
-          email: 'admin@mecpro.com',
-          phone: '0000000000',
-          status: 'ACTIVE',
-        },
-      });
-    }
-
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const user = await this.prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
         password: hashedPassword,
-        role: 'SUPER_ADMIN',
-        tenantId: tenant.id,
+        role: 'ADMIN',
+        tenantId: null,
         status: 'ACTIVE',
       },
     });
 
     return {
-      message: 'Administrador cadastrado com sucesso',
+      message: 'Administrador global cadastrado com sucesso',
       user,
     };
   }
@@ -205,13 +184,15 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Credenciais inválidas');
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('Credenciais inválidas');
-    if (!user.tenantId) throw new UnauthorizedException('Usuário sem tenant');
+    if (!user.tenantId && user.role !== 'ADMIN') {
+      throw new UnauthorizedException('Usuário sem tenant');
+    }
 
     if (user.status === 'BLOCKED') {
       throw new UnauthorizedException('Usuário bloqueado. Contate o suporte.');
     }
 
-    if (!user.tenant || user.tenant.status !== 'ACTIVE') {
+    if (user.tenantId && (!user.tenant || user.tenant.status !== 'ACTIVE')) {
       this.logger.warn(`Tentativa de login para tenant bloqueado/cancelado: ${email}`);
       throw new UnauthorizedException('Sua conta da oficina foi bloqueada ou cancelada. Entre em contato com o suporte.');
     }
@@ -269,6 +250,29 @@ export class AuthService {
     };
   }
 
+  async superAdminLogin(email: string, password: string) {
+    const superAdmin = await this.prisma.superAdmin.findUnique({
+      where: { email },
+    });
+    if (!superAdmin) throw new UnauthorizedException('Credenciais inválidas');
+    const valid = await bcrypt.compare(password, superAdmin.password);
+    if (!valid) throw new UnauthorizedException('Credenciais inválidas');
+    const payload = {
+      sub: `sa_${superAdmin.id}`,
+      email: superAdmin.email,
+      isSuperAdmin: true,
+    };
+    const accessToken = this.jwtService.sign(payload);
+    return {
+      accessToken,
+      user: {
+        id: superAdmin.id,
+        email: superAdmin.email,
+        role: 'SUPER_ADMIN',
+      },
+    };
+  }
+
   async logout(userId: number, sessionToken: string) {
     await this.prisma.userSession.deleteMany({
       where: { userId, sessionToken },
@@ -302,7 +306,7 @@ export class AuthService {
     if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Usuário bloqueado');
     }
-    if (!user.tenant || user.tenant.status !== 'ACTIVE') {
+    if (user.tenantId && (!user.tenant || user.tenant.status !== 'ACTIVE')) {
       throw new UnauthorizedException('Sua conta da oficina foi bloqueada ou cancelada');
     }
 
@@ -362,9 +366,6 @@ export class AuthService {
     };
   }
 
-  // =====================================================
-  //  NOVO MÉTODO - completeRegistration
-  // =====================================================
   async completeRegistration(token: string, password: string) {
     const tenant = await this.prisma.tenant.findFirst({
       where: {
