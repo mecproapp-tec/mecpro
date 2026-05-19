@@ -12,7 +12,7 @@ import {
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { getEstimates, getConvertedEstimates, deleteEstimate, updateEstimate, sendEstimateWhatsApp, type Estimate, resendEstimatePdf } from "../../../services/Estimates";
-import { getClientById, getVehicleDisplay, type Client } from "../../../services/clients";
+import { getClientById, type Client } from "../../../services/clients";
 import api from "../../../services/api";
 
 type FilterType = "todos" | "accepted" | "pending" | "converted";
@@ -321,7 +321,20 @@ export default function Orcamentos() {
     }
   };
 
-  const orcamentosFiltrados = orcamentos; // filtro já aplicado no backend
+  // 🔥 FILTRO LOCAL: aplica o status correto para os filtros "todos", "pending", "accepted"
+  const orcamentosFiltrados = (() => {
+    if (filtro === "converted") {
+      return orcamentos;
+    }
+    if (filtro === "pending") {
+      return orcamentos.filter(o => o.status === "pending");
+    }
+    if (filtro === "accepted") {
+      return orcamentos.filter(o => o.status === "accepted");
+    }
+    return orcamentos;
+  })();
+
   const totalGeral = orcamentos
     .filter(o => o.status !== "converted")
     .reduce((acc, o) => acc + Number(o.total), 0);
@@ -453,7 +466,7 @@ export default function Orcamentos() {
                           </button>
                         </div>
                       </td>
-                    <tr>
+                    </tr>
                   );
                 })}
                 {orcamentosFiltrados.length === 0 && (
