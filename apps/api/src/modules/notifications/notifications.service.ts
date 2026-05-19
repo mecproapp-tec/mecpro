@@ -54,17 +54,6 @@ export class NotificationsService {
     });
   }
 
-  async delete(id: number, tenantId: string) {
-    const notification = await this.prisma.notification.findFirst({
-      where: { id, tenantId },
-    });
-    if (!notification) throw new NotFoundException('Notificação não encontrada');
-    
-    await this.prisma.notification.delete({
-      where: { id },
-    });
-  }
-
   async create(tenantId: string, title: string, message: string, appointmentId?: number) {
     const notification = await this.prisma.notification.create({
       data: {
@@ -86,5 +75,26 @@ export class NotificationsService {
     });
     if (existing) return existing;
     return this.create(tenantId, title, message, appointmentId);
+  }
+
+  // 🔥 NOVO MÉTODO: excluir uma notificação
+  async delete(id: number, tenantId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id, tenantId },
+    });
+    if (!notification) throw new NotFoundException('Notificação não encontrada');
+    
+    await this.prisma.notification.delete({
+      where: { id },
+    });
+    return { success: true };
+  }
+
+  // 🔥 NOVO MÉTODO: excluir todas as notificações lidas do tenant
+  async deleteAllRead(tenantId: string) {
+    const result = await this.prisma.notification.deleteMany({
+      where: { tenantId, read: true },
+    });
+    return { count: result.count };
   }
 }

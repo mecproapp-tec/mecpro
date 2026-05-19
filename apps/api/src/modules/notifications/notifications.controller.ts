@@ -5,9 +5,9 @@ import {
   Post,
   Body,
   Param,
+  Delete,
   UseGuards,
   Query,
-  Delete,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -62,9 +62,19 @@ export class NotificationsController {
     return { success: true };
   }
 
+  // 🔥 NOVO: excluir uma notificação
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async delete(@Param('id') id: string, @CurrentUser() user: UserPayload) {
     await this.notificationsService.delete(Number(id), user.tenantId);
+    return { success: true, message: 'Notificação excluída com sucesso' };
+  }
+
+  // 🔥 NOVO: excluir todas as notificações lidas
+  @Delete('read/all')
+  @HttpCode(HttpStatus.OK)
+  async deleteAllRead(@CurrentUser() user: UserPayload) {
+    const result = await this.notificationsService.deleteAllRead(user.tenantId);
+    return { success: true, count: result.count, message: `${result.count} notificações lidas excluídas` };
   }
 }
