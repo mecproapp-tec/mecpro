@@ -67,6 +67,11 @@ export default function Notificacoes() {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR') + ', ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   if (loading) return <div style={styles.loading}>Carregando...</div>;
 
   const hasUnread = notifications.some(n => !n.read);
@@ -109,7 +114,7 @@ export default function Notificacoes() {
               <div style={styles.itemContent} onClick={() => !notif.read && handleMarkAsRead(notif.id)}>
                 <div style={styles.itemTitle}>{notif.title}</div>
                 <div style={styles.itemMessage}>{notif.message}</div>
-                <div style={styles.itemDate}>{new Date(notif.createdAt).toLocaleString()}</div>
+                <div style={styles.itemDate}>{formatDate(notif.createdAt)}</div>
               </div>
               <button
                 onClick={(e) => handleDelete(notif.id, e)}
