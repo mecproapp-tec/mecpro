@@ -155,9 +155,9 @@
   <div class="body">
     <div class="company-info">
       {{#if companyLogo}}<img src="{{companyLogo}}" class="logo" alt="Logo">{{/if}}
-      <h2>{{companyName}}</h2>
-      <p>{{companyDocument}} | {{companyPhone}}</p>
-      <p>{{companyEmail}}</p>
+      <h2>Razão Social: {{companyName}}</h2>
+      <p>CNPJ: {{companyDocument}} | Contato: {{companyPhone}}</p>
+      <p>E-mail: {{companyEmail}}</p>
       <p>{{companyAddress}}</p>
     </div>
     <div class="client-box">
@@ -175,7 +175,7 @@
       <span>Emissão: {{issueDate}}</span>
       <span>Validade: {{validUntil}}</span>
     </div>
-    </table>
+    <table>
       <thead>
         <tr>
           <th>Descrição</th>

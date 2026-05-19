@@ -227,9 +227,9 @@
       {{#if companyLogo}}
         <img src="{{companyLogo}}" class="logo" alt="Logo">
       {{/if}}
-      <h2>{{companyName}}</h2>
-      <p>{{companyDocument}} | {{companyPhone}}</p>
-      <p>{{companyEmail}}</p>
+      <h2>Razão Social: {{companyName}}</h2>
+      <p>CNPJ: {{companyDocument}} | Contato: {{companyPhone}}</p>
+      <p>E-mail: {{companyEmail}}</p>
       <p>{{companyAddress}}</p>
     </div>
 
@@ -246,8 +246,8 @@
     </div>
 
     <div class="dates">
-      <span>📅 Emissão: {{issueDate}}</span>
-      <span>⏰ Vencimento: {{dueDate}}</span>
+      <span>Emissão: {{issueDate}}</span>
+      <span>Vencimento: {{dueDate}}</span>
     </div>
 
     <div class="table-wrapper">
@@ -278,16 +278,16 @@
     </div>
 
     <div class="totals">
-      <p>📊 Subtotal (sem ISS): R$ {{subtotal}}</p>
-      <p>💰 Total de ISS: R$ {{totalIss}}</p>
-      <div class="total-geral">🎯 TOTAL GERAL: R$ {{total}}</div>
-      <div class="payment-method">💳 Forma de Pagamento: {{paymentMethod}}</div>
+      <p>Subtotal (sem ISS): R$ {{subtotal}}</p>
+      <p>Total de ISS: R$ {{totalIss}}</p>
+      <div class="total-geral">TOTAL GERAL: R$ {{total}}</div>
+      <div class="payment-method">Forma de Pagamento: {{paymentMethod}}</div>
     </div>
   </div>
 
   <div class="footer">
     <p>{{companyName}} - {{companyPhone}} | {{companyEmail}}</p>
-    <p>📄 Esta fatura é um documento oficial.</p>
+    <p>Esta fatura é um documento oficial.</p>
   </div>
 </div>
 </body>
