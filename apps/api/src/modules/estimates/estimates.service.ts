@@ -16,6 +16,11 @@ import {
 } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
+function parseLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+}
+
 @Injectable()
 export class EstimatesService {
   private readonly logger = new Logger(EstimatesService.name);
@@ -113,7 +118,7 @@ export class EstimatesService {
       this.calculate(inputItems);
 
     const estimateDate = date
-      ? new Date(date)
+      ? parseLocalDate(date)
       : new Date();
 
     try {
@@ -344,7 +349,7 @@ export class EstimatesService {
         }
 
         if (date) {
-          updateData.date = new Date(date);
+          updateData.date = parseLocalDate(date);
         }
 
         if (status) {
