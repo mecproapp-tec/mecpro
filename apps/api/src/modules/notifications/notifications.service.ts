@@ -54,6 +54,17 @@ export class NotificationsService {
     });
   }
 
+  async delete(id: number, tenantId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id, tenantId },
+    });
+    if (!notification) throw new NotFoundException('Notificação não encontrada');
+    
+    await this.prisma.notification.delete({
+      where: { id },
+    });
+  }
+
   async create(tenantId: string, title: string, message: string, appointmentId?: number) {
     const notification = await this.prisma.notification.create({
       data: {

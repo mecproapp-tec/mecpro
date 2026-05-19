@@ -7,6 +7,9 @@ import {
   Param,
   UseGuards,
   Query,
+  Delete,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { SessionGuard } from '../../auth/guards/session.guard';
@@ -57,5 +60,11 @@ export class NotificationsController {
   async markAllAsRead(@CurrentUser() user: UserPayload) {
     await this.notificationsService.markAllAsRead(user.tenantId);
     return { success: true };
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(@Param('id') id: string, @CurrentUser() user: UserPayload) {
+    await this.notificationsService.delete(Number(id), user.tenantId);
   }
 }
