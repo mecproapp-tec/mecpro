@@ -11,7 +11,7 @@ import {
   FiEye,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
-import { getEstimates, deleteEstimate, updateEstimate, sendEstimateWhatsApp, type Estimate, resendEstimatePdf } from "../../../services/Estimates";
+import { getEstimates, getConvertedEstimates, deleteEstimate, updateEstimate, sendEstimateWhatsApp, type Estimate, resendEstimatePdf } from "../../../services/Estimates";
 import { getClientById, getVehicleDisplay, type Client } from "../../../services/clients";
 import api from "../../../services/api";
 
@@ -63,7 +63,12 @@ export default function Orcamentos() {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const response = await getEstimates(1, 100);
+      let response;
+      if (filtro === "converted") {
+        response = await getConvertedEstimates(1, 100);
+      } else {
+        response = await getEstimates(1, 100);
+      }
       
       let estimatesData: Estimate[] = [];
       
@@ -133,7 +138,7 @@ export default function Orcamentos() {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [filtro]); // recarrega quando o filtro muda
 
   const handleExcluir = async (id: number) => {
     const confirmar = confirm("Tem certeza que deseja excluir este orçamento?");
@@ -316,11 +321,8 @@ export default function Orcamentos() {
     }
   };
 
-  const orcamentosFiltrados = orcamentos.filter((o) => {
-    if (filtro === "todos") return o.status !== "converted";
-    return o.status === filtro;
-  });
-
+  // Os orçamentos já vêm filtrados pelo backend, então orcamentosFiltrados é o próprio estado
+  const orcamentosFiltrados = orcamentos;
   const totalGeral = orcamentos
     .filter(o => o.status !== "converted")
     .reduce((acc, o) => acc + Number(o.total), 0);
@@ -403,6 +405,7 @@ export default function Orcamentos() {
               <tbody>
                 {orcamentosFiltrados.map((o, index) => {
                   const cliente = o.client;
+                  const isConverted = o.status === "converted";
                   return (
                     <tr key={o.id} style={{ ...styles.tableRow, background: index % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }}>
                       <td style={styles.td}>{cliente?.name || "Cliente não encontrado"}</td>
@@ -412,7 +415,7 @@ export default function Orcamentos() {
                       <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>R$ {Number(o.total).toFixed(2)}</td>
                       <td style={styles.td}>{getPaymentMethodLabel(o.paymentMethod)}</td>
                       <td style={styles.td}>
-                        {o.status === "converted" ? (
+                        {isConverted ? (
                           <span style={styles.convertedStatus}>{getStatusLabel(o.status)}</span>
                         ) : (
                           <select
@@ -430,29 +433,25 @@ export default function Orcamentos() {
                           <button onClick={() => navigate(`/clientes/ver/${o.clientId}`)} style={styles.actionButton} title="Ver cliente">
                             <FiEye size={16} />
                           </button>
-                          {o.status === "converted" ? (
-                            <button onClick={() => handleExcluir(o.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir">
-                              <FiTrash2 size={16} />
-                            </button>
-                          ) : (
+                          <button onClick={() => handleExcluir(o.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir">
+                            <FiTrash2 size={16} />
+                          </button>
+                          {!isConverted && (
                             <>
                               <button onClick={() => navigate(`/orcamentos/editar/${o.id}`)} style={styles.actionButton} title="Editar orçamento">
                                 <FiEdit size={16} />
                               </button>
-                              <button onClick={() => handleExcluir(o.id)} style={{ ...styles.actionButton, color: "#ff5555", borderColor: "#ff555530" }} title="Excluir">
-                                <FiTrash2 size={16} />
-                              </button>
                               <button onClick={() => handleConverter(o)} style={{ ...styles.actionButton, color: "#ffcc00", borderColor: "#ffcc0030" }} title="Converter em Fatura">
                                 <FiRefreshCw size={16} />
                               </button>
-                              <button onClick={() => handlePDF(o)} style={styles.actionButton} title="Gerar PDF">
-                                <FiFileText size={16} />
-                              </button>
-                              <button onClick={() => handleWhatsApp(o, 'estimate')} style={{ ...styles.actionButton, color: "#25D366", borderColor: "#25D36630" }} title="Enviar WhatsApp">
-                                <FiMessageCircle size={16} />
-                              </button>
                             </>
                           )}
+                          <button onClick={() => handlePDF(o)} style={styles.actionButton} title="Gerar PDF">
+                            <FiFileText size={16} />
+                          </button>
+                          <button onClick={() => handleWhatsApp(o, 'estimate')} style={{ ...styles.actionButton, color: "#25D366", borderColor: "#25D36630" }} title="Enviar WhatsApp">
+                            <FiMessageCircle size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>

@@ -60,6 +60,19 @@ export const getEstimates = async (page = 1, limit = 50) => {
   };
 };
 
+// 🔥 NOVA FUNÇÃO: buscar orçamentos convertidos
+export const getConvertedEstimates = async (page = 1, limit = 50) => {
+  const response = await api.get(`/estimates/converted?page=${page}&limit=${limit}`);
+  const dataArray = normalizeArray<Estimate>(response.data);
+  return {
+    data: dataArray,
+    total: response.data?.total ?? dataArray.length,
+    page,
+    limit,
+    totalPages: Math.ceil((response.data?.total ?? dataArray.length) / limit),
+  };
+};
+
 export const getEstimateById = async (id: number): Promise<Estimate> => {
   const response = await api.get(`/estimates/${id}`);
   return extractObject(response.data);
