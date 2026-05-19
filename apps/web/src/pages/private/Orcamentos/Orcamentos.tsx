@@ -406,7 +406,7 @@ export default function Orcamentos() {
                   return (
                     <tr key={o.id} style={{ ...styles.tableRow, background: index % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }}>
                       <td style={styles.td}>{cliente?.name || "Cliente não encontrado"}</td>
-                      <td style={styles.td}>{cliente ? getVehicleDisplay(cliente) : "Não informado"}</td>
+                      <td style={styles.td}>{cliente?.vehicle || "Não informado"}</td>
                       <td style={styles.td}>{cliente?.plate || ""}</td>
                       <td style={styles.td}>{new Date(o.date).toLocaleDateString("pt-BR")}</td>
                       <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>R$ {Number(o.total).toFixed(2)}</td>

@@ -333,7 +333,7 @@ export default function Faturas() {
                     <tr key={f.id} style={{ ...styles.tableRow, background: index % 2 === 0 ? "#0f0f0f" : "#1a1a1a" }}>
                       <td style={styles.td}>{f.number || f.id}</td>
                       <td style={styles.td}>{cliente?.name || "Cliente não encontrado"}</td>
-                      <td style={styles.td}>{cliente ? getVehicleDisplay(cliente) : "Não informado"}</td>
+                      <td style={styles.td}>{cliente?.vehicle || "Não informado"}</td>
                       <td style={styles.td}>{cliente?.plate || ""}</td>
                       <td style={styles.td}>{new Date(f.createdAt).toLocaleDateString("pt-BR")}</td>
                       <td style={{ ...styles.td, textAlign: "right", color: "#00e5ff", fontWeight: "600" }}>R$ {totalComIss.toFixed(2)}</td>

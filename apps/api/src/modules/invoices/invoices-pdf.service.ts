@@ -12,6 +12,16 @@ export class InvoicesPdfService {
 
   constructor(private readonly storageService: StorageService) {}
 
+  private getPaymentMethodLabel(method?: string): string {
+    switch (method) {
+      case 'CREDIT_CARD': return 'Cartão de Crédito';
+      case 'DEBIT_CARD': return 'Cartão de Débito';
+      case 'BANK_TRANSFER': return 'Transferência Bancária';
+      case 'PIX': return 'PIX';
+      default: return 'Não informado';
+    }
+  }
+
   private async getBrowser() {
     const chromePath = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
     if (fs.existsSync(chromePath)) {
@@ -78,7 +88,6 @@ export class InvoicesPdfService {
       let subtotal = 0;
       let totalIss = 0;
       
-      // Calcular itens com ISS
       const items = (invoice.items || []).map((item: any) => {
         const quantity = Number(item.quantity) || 1;
         const price = Number(item.price) || 0;
@@ -124,6 +133,7 @@ export class InvoicesPdfService {
         subtotal: subtotal.toFixed(2),
         totalIss: totalIss.toFixed(2),
         total: total.toFixed(2),
+        paymentMethod: this.getPaymentMethodLabel(invoice.paymentMethod),
         companyName: tenant.name || 'MecPro',
         companyDocument: tenant.documentNumber || 'CNPJ: --',
         companyPhone: tenant.phone || '(11) 99999-9999',
