@@ -24,6 +24,7 @@ export interface Invoice {
   shareToken?: string;
   shareTokenExpires?: string;
   items: InvoiceItem[];
+  paymentMethod?: string;
   client?: {
     id: number;
     name: string;
@@ -39,6 +40,7 @@ export interface CreateInvoiceData {
   clientId: number;
   items: Omit<InvoiceItem, "id" | "total">[];
   status?: "PENDING" | "PAID" | "CANCELED";
+  paymentMethod?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -108,13 +110,11 @@ export function calculateTotalWithIss(items: InvoiceItem[]): number {
   }, 0);
 }
 
-// 🔥 BUG #58 CORRIGIDO: shareInvoice sem fallback frágil
 export const shareInvoice = async (id: number): Promise<{ shareUrl: string }> => {
   try {
     const response = await api.post(`/invoices/${id}/share`);
     return extractObject(response.data);
   } catch (error: any) {
-    // Se o endpoint POST não existir, tentar GET (apenas uma vez)
     if (error.response?.status === 404 || error.response?.status === 405) {
       console.warn(`POST /invoices/${id}/share não disponível, tentando GET...`);
       const response = await api.get(`/invoices/${id}/share`);
@@ -129,7 +129,6 @@ export const sendInvoiceWhatsApp = async (id: number, phoneNumber?: string) => {
   return extractObject(response.data);
 };
 
-// 🔥 NOVA FUNÇÃO PARA REGERAR PDF (sempre com dados atualizados da oficina)
 export const resendInvoicePdf = async (id: number): Promise<{ pdfUrl: string }> => {
   const response = await api.post(`/invoices/${id}/resend-pdf`);
   return extractObject(response.data);

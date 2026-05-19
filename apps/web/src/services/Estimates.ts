@@ -24,6 +24,7 @@ export interface Estimate {
   shareToken?: string;
   shareTokenExpires?: string;
   items: EstimateItem[];
+  paymentMethod?: string;
   client?: {
     id: number;
     name: string;
@@ -40,6 +41,7 @@ export interface CreateEstimateData {
   date: string;
   items: Omit<EstimateItem, "id" | "total">[];
   status?: "DRAFT" | "SENT" | "APPROVED" | "CONVERTED";
+  paymentMethod?: string;
 }
 
 function extractObject(data: any) {
@@ -110,7 +112,6 @@ export const getEstimateByToken = async (token: string): Promise<Estimate> => {
   return extractObject(response.data);
 };
 
-// 🔥 NOVA FUNÇÃO PARA REGERAR PDF (sempre com dados atualizados da oficina)
 export const resendEstimatePdf = async (id: number): Promise<{ pdfUrl: string }> => {
   const response = await api.post(`/estimates/${id}/resend-pdf`);
   return extractObject(response.data);

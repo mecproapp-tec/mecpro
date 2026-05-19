@@ -4,20 +4,28 @@
 <meta charset="UTF-8">
 <title>Orçamento #{{estimateNumber}}</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
   body {
-    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+    font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
     background: #f0f4f8;
     padding: 40px 20px;
+    line-height: 1.4;
   }
+
   .document {
     max-width: 1100px;
-    margin: auto;
+    margin: 0 auto;
     background: white;
     border-radius: 16px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     overflow: hidden;
   }
+
   .header {
     background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%);
     color: white;
@@ -25,28 +33,44 @@
     text-align: center;
     border-bottom: 4px solid #00e5ff;
   }
+
   .header h1 {
     font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
     margin-bottom: 8px;
   }
+
   .body {
     padding: 30px;
   }
+
   .company-info {
     text-align: right;
     margin-bottom: 30px;
     padding-bottom: 20px;
     border-bottom: 2px solid #e0e0e0;
   }
+
   .company-info h2 {
     color: #000000;
-    margin-bottom: 5px;
+    font-size: 20px;
+    margin-bottom: 8px;
   }
+
   .company-info p {
     color: #666;
     font-size: 12px;
     margin: 3px 0;
   }
+
+  .logo {
+    max-width: 120px;
+    max-height: 60px;
+    object-fit: contain;
+    margin-bottom: 10px;
+  }
+
   .client-box {
     background: linear-gradient(145deg, #f8f9fa 0%, #ffffff 100%);
     padding: 20px;
@@ -54,24 +78,36 @@
     margin-bottom: 25px;
     border: 1px solid #e0e0e0;
   }
+
   .client-box h3 {
     background: #0a0a0a;
     color: #00e5ff;
     display: inline-block;
     padding: 6px 16px;
     border-radius: 20px;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 600;
     margin-bottom: 15px;
   }
+
   .client-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 12px 20px;
   }
+
+  .client-item {
+    font-size: 13px;
+    color: #333;
+  }
+
   .client-item strong {
     min-width: 80px;
     display: inline-block;
+    color: #000;
+    font-weight: 600;
   }
+
   .dates {
     background: #0a0a0a;
     color: #00e5ff;
@@ -83,34 +119,60 @@
     font-size: 13px;
     font-weight: 500;
   }
+
+  .table-wrapper {
+    overflow-x: auto;
+    margin: 20px 0;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 20px 0;
     font-size: 13px;
+    min-width: 650px;
   }
+
   th {
     background: #0a0a0a;
     color: #00e5ff;
     padding: 14px 12px;
     text-align: left;
+    font-weight: 600;
   }
+
   td {
     padding: 16px 12px;
     border-bottom: 1px solid #e0e0e0;
+    vertical-align: top;
   }
-  .text-right { text-align: right; }
-  .text-center { text-align: center; }
+
+  .text-right {
+    text-align: right;
+  }
+
+  .text-center {
+    text-align: center;
+  }
+
+  .description-cell {
+    word-break: break-word;
+    white-space: normal;
+    max-width: 300px;
+  }
+
   .totals {
     margin-top: 25px;
     text-align: right;
     border-top: 2px solid #e0e0e0;
     padding-top: 20px;
   }
+
   .totals p {
     margin: 8px 0;
     font-size: 14px;
+    font-weight: 500;
   }
+
   .total-geral {
     font-size: 22px;
     font-weight: bold;
@@ -121,6 +183,7 @@
     border-radius: 40px;
     margin-top: 15px;
   }
+
   .payment-method {
     margin-top: 15px;
     font-size: 14px;
@@ -131,6 +194,7 @@
     padding: 6px 20px;
     border-radius: 20px;
   }
+
   .footer {
     background: #f8f9fa;
     padding: 20px;
@@ -139,11 +203,16 @@
     color: #888;
     border-top: 1px solid #e0e0e0;
   }
-  .logo {
-    max-width: 120px;
-    max-height: 60px;
-    object-fit: contain;
-    margin-bottom: 10px;
+
+  @media print {
+    body {
+      background: white;
+      padding: 0;
+    }
+    .document {
+      box-shadow: none;
+      border-radius: 0;
+    }
   }
 </style>
 </head>
@@ -152,14 +221,18 @@
   <div class="header">
     <h1>ORÇAMENTO Nº {{estimateNumber}}</h1>
   </div>
+
   <div class="body">
     <div class="company-info">
-      {{#if companyLogo}}<img src="{{companyLogo}}" class="logo" alt="Logo">{{/if}}
-      <h2>Razão Social: {{companyName}}</h2>
+      {{#if companyLogo}}
+        <img src="{{companyLogo}}" class="logo" alt="Logo">
+      {{/if}}
+      <h2>{{companyName}}</h2>
       <p>CNPJ: {{companyDocument}} | Contato: {{companyPhone}}</p>
       <p>E-mail: {{companyEmail}}</p>
       <p>{{companyAddress}}</p>
     </div>
+
     <div class="client-box">
       <h3>DADOS DO CLIENTE</h3>
       <div class="client-grid">
@@ -171,34 +244,39 @@
         <div class="client-item"><strong>Endereço:</strong> {{client.address}}</div>
       </div>
     </div>
+
     <div class="dates">
       <span>Emissão: {{issueDate}}</span>
       <span>Validade: {{validUntil}}</span>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Descrição</th>
-          <th class="text-right">Qtde</th>
-          <th class="text-right">Valor Unit.</th>
-          <th class="text-center">ISS %</th>
-          <th class="text-right">ISS Valor</th>
-          <th class="text-right">Total c/ ISS</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each items}}
-        <tr>
-          <td>{{description}}</td>
-          <td class="text-right">{{quantity}}</td>
-          <td class="text-right">R$ {{unitPrice}}</td>
-          <td class="text-center">{{issPercent}}%</td>
-          <td class="text-right">R$ {{issValue}}</td>
-          <td class="text-right">R$ {{totalWithIss}}</td>
-        </tr>
-        {{/each}}
-      </tbody>
-    </table>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Descrição</th>
+            <th class="text-right">Qtde</th>
+            <th class="text-right">Valor Unit.</th>
+            <th class="text-center">ISS (%)</th>
+            <th class="text-right">Valor ISS</th>
+            <th class="text-right">Total com ISS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td class="description-cell">{{description}}</td>
+            <td class="text-right">{{quantity}}</td>
+            <td class="text-right">R$ {{unitPrice}}</td>
+            <td class="text-center">{{issPercent}}%</td>
+            <td class="text-right">R$ {{issValue}}</td>
+            <td class="text-right">R$ {{totalWithIss}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
     <div class="totals">
       <p>Subtotal (sem ISS): R$ {{subtotal}}</p>
       <p>Total de ISS: R$ {{totalIss}}</p>
@@ -206,6 +284,7 @@
       <div class="payment-method">Forma de Pagamento: {{paymentMethod}}</div>
     </div>
   </div>
+
   <div class="footer">
     <p>{{companyName}} - {{companyPhone}} | {{companyEmail}}</p>
     <p>Este documento é um orçamento oficial. Em caso de dúvidas, entre em contato.</p>
