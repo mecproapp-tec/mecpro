@@ -6,7 +6,9 @@ import {
   Logger,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { PaymentService } from '../payments/payment.service';
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { MailService } from '../modules/mail/mail.service';
@@ -30,38 +32,45 @@ export class WebhookController {
     @Body() body: any,
     @Headers() headers: any,
   ) {
-    this.logger.log(`🔔 Webhook recebido: ${JSON.stringify(body)}`);
+    this.logger.log(`Webhook received type: ${body.type}`);
+
+    if (!this.validateSignature(body, headers)) {
+      this.logger.error('Invalid webhook signature');
+      throw new BadRequestException('Invalid signature');
+    }
 
     const { type, data } = body;
-
     if (!data?.id) {
-      this.logger.warn('Webhook sem data.id');
+      this.logger.warn('Webhook without data.id');
       return { received: true };
     }
 
     try {
-      if (type === 'preapproval') {
+      if (type === 'preapproval' || type === 'subscription_preapproval') {
         await this.handlePreapproval(data.id);
-      }
-      else if (type === 'payment') {
+      } else if (type === 'payment') {
         await this.handlePayment(data.id);
-      }
-      else {
-        this.logger.log(`Tipo de evento ignorado: ${type}`);
+      } else {
+        this.logger.log(`Ignored event type: ${type}`);
       }
     } catch (error: any) {
-      this.logger.error(`Erro no webhook: ${error.message}`);
+      this.logger.error(`Webhook processing error: ${error.message}`);
     }
 
     return { received: true };
   }
 
   private async handlePreapproval(preapprovalId: string) {
-    this.logger.log(`📌 Processando preapproval: ${preapprovalId}`);
+    this.logger.log(`Processing preapproval: ${preapprovalId}`);
 
     const mpSubscription = await this.paymentService.getSubscription(preapprovalId);
     if (!mpSubscription) {
-      this.logger.warn(`Assinatura não encontrada no MP: ${preapprovalId}`);
+      this.logger.warn(`Subscription not found in MP: ${preapprovalId}`);
+      return;
+    }
+
+    if (mpSubscription.status !== 'authorized') {
+      this.logger.log(`Subscription not authorized yet: ${mpSubscription.status}`);
       return;
     }
 
@@ -69,7 +78,7 @@ export class WebhookController {
       where: { gatewaySubscriptionId: mpSubscription.id },
     });
     if (alreadyProcessed) {
-      this.logger.log(`⏭️ Assinatura já processada: ${mpSubscription.id}`);
+      this.logger.log(`Subscription already processed: ${mpSubscription.id}`);
       return;
     }
 
@@ -88,17 +97,25 @@ export class WebhookController {
       });
     }
     if (!pendingSub) {
-      this.logger.warn(`PendingSubscription não encontrado para assinatura ${preapprovalId}`);
+      this.logger.warn(`PendingSubscription not found for ${preapprovalId}`);
       return;
     }
 
-    let tenant = await this.prisma.tenant.findFirst({
+    const existingTenant = await this.prisma.tenant.findFirst({
       where: { email: pendingSub.email },
     });
+    if (existingTenant) {
+      this.logger.log(`Tenant already exists for email ${pendingSub.email}`);
+      return;
+    }
 
-    if (!tenant) {
-      const registrationToken = randomUUID();
-      tenant = await this.prisma.tenant.create({
+    const registrationToken = randomUUID();
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const magicLink = `${frontendUrl}/complete-registration?token=${registrationToken}`;
+    const emailText = `Olá ${pendingSub.officeName || 'Oficina'},\n\nClique no link abaixo para definir sua senha e ativar sua conta:\n${magicLink}\n\nLink válido por 7 dias.\n\nEquipe MecPro`;
+
+    await this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
         data: {
           id: randomUUID(),
           name: pendingSub.officeName || 'Oficina',
@@ -108,16 +125,14 @@ export class WebhookController {
           cep: pendingSub.cep || '',
           address: pendingSub.address || '',
           phone: pendingSub.phone || '',
-          status: 'BLOCKED',
+          status: 'ACTIVE',
           subscriptionId: mpSubscription.id,
           registrationToken,
           registrationTokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         },
       });
-      this.logger.log(`✅ Tenant criado: ${tenant.id}`);
 
-      // Cria o usuário (sem senha ainda)
-      await this.prisma.user.create({
+      await tx.user.create({
         data: {
           name: pendingSub.officeName || 'Oficina',
           email: pendingSub.email,
@@ -128,73 +143,50 @@ export class WebhookController {
         },
       });
 
-      // Envia e-mail com link mágico
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const magicLink = `${frontendUrl}/complete-registration?token=${registrationToken}`;
-      const emailText = `Olá ${pendingSub.officeName || 'Oficina'},\n\nClique no link abaixo para definir sua senha e ativar sua conta:\n${magicLink}\n\nLink válido por 7 dias.\n\nEquipe MecPro`;
-      await this.mailService.sendEmail(
-        pendingSub.email,
-        'Complete seu cadastro - MecPro',
-        emailText,
-      );
-      this.logger.log(`📧 E-mail mágico enviado para ${pendingSub.email}`);
-    }
+      await tx.subscription.create({
+        data: {
+          id: randomUUID(),
+          tenantId: tenant.id,
+          planName: 'PLANO_MECPRO',
+          price: 149.9,
+          status: 'ACTIVE',
+          gateway: 'MERCADOPAGO',
+          gatewaySubscriptionId: mpSubscription.id,
+          startDate: new Date(),
+          endDate: mpSubscription.next_payment_date
+            ? new Date(mpSubscription.next_payment_date)
+            : null,
+        },
+      });
 
-    let tenantStatus: 'ACTIVE' | 'BLOCKED' | 'CANCELED' = 'BLOCKED';
-    let subscriptionStatus: 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' = 'PAST_DUE';
+      await tx.pendingSubscription.update({
+        where: { id: pendingSub.id },
+        data: {
+          subscriptionId: mpSubscription.id,
+          status: 'PAID',
+        },
+      });
 
-    if (mpSubscription.status === 'authorized') {
-      tenantStatus = 'ACTIVE';
-      subscriptionStatus = 'ACTIVE';
-    } else if (mpSubscription.status === 'cancelled') {
-      tenantStatus = 'CANCELED';
-      subscriptionStatus = 'CANCELED';
-    }
-
-    await this.prisma.tenant.update({
-      where: { id: tenant.id },
-      data: {
-        subscriptionId: mpSubscription.id,
-        status: tenantStatus,
-        trialEndsAt: mpSubscription.next_payment_date
-          ? new Date(mpSubscription.next_payment_date)
-          : pendingSub.trialEndsAt,
-      },
+      await tx.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          trialEndsAt: mpSubscription.next_payment_date
+            ? new Date(mpSubscription.next_payment_date)
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
     });
 
-    await this.prisma.subscription.create({
-      data: {
-        id: randomUUID(),
-        tenantId: tenant.id,
-        planName: 'PLANO_MECPRO',
-        price: 149.9,
-        status: subscriptionStatus,
-        gateway: 'MERCADOPAGO',
-        gatewaySubscriptionId: mpSubscription.id,
-        startDate: new Date(),
-        endDate: mpSubscription.next_payment_date
-          ? new Date(mpSubscription.next_payment_date)
-          : null,
-      },
-    });
-
-    await this.prisma.pendingSubscription.update({
-      where: { id: pendingSub.id },
-      data: {
-        subscriptionId: mpSubscription.id,
-        status: 'PAID',
-      },
-    });
-
-    this.logger.log(`✅ Assinatura ${preapprovalId} processada com sucesso`);
+    await this.mailService.sendEmail(pendingSub.email, 'Complete seu cadastro - MecPro', emailText);
+    this.logger.log(`Preapproval ${preapprovalId} processed successfully, email sent to ${pendingSub.email}`);
   }
 
   private async handlePayment(paymentId: string) {
-    this.logger.log(`💰 Processando pagamento: ${paymentId}`);
+    this.logger.log(`Processing payment: ${paymentId}`);
 
     const paymentDetails = await this.paymentService.getPayment(paymentId);
     if (!paymentDetails) {
-      this.logger.warn(`Pagamento não encontrado: ${paymentId}`);
+      this.logger.warn(`Payment not found: ${paymentId}`);
       return;
     }
 
@@ -206,37 +198,73 @@ export class WebhookController {
       });
 
       if (!subscription) {
-        this.logger.warn(`Assinatura local não encontrada: ${subscriptionId}`);
+        this.logger.warn(`Local subscription not found: ${subscriptionId}`);
         return;
       }
 
-      if (paymentDetails.status === 'approved') {
-        await this.prisma.tenant.update({
-          where: { id: subscription.tenantId },
-          data: {
-            status: 'ACTIVE',
-            trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          },
-        });
+      await this.prisma.$transaction(async (tx) => {
+        if (paymentDetails.status === 'approved') {
+          await tx.tenant.update({
+            where: { id: subscription.tenantId },
+            data: {
+              status: 'ACTIVE',
+              trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
+          });
 
-        await this.prisma.subscription.update({
-          where: { id: subscription.id },
-          data: {
-            status: 'ACTIVE',
-            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          },
-        });
+          await tx.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              status: 'ACTIVE',
+              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
+          });
 
-        this.logger.log(`✅ Assinatura ${subscriptionId} renovada com pagamento ${paymentId}`);
-      } else {
-        await this.prisma.tenant.update({
-          where: { id: subscription.tenantId },
-          data: { status: 'BLOCKED' },
-        });
-        this.logger.warn(`❌ Pagamento ${paymentId} não aprovado. Tenant bloqueado.`);
-      }
+          this.logger.log(`Subscription ${subscriptionId} renewed with payment ${paymentId}`);
+        } else {
+          await tx.tenant.update({
+            where: { id: subscription.tenantId },
+            data: { status: 'BLOCKED' },
+          });
+          this.logger.warn(`Payment ${paymentId} not approved. Tenant blocked.`);
+        }
+      });
     } else {
-      this.logger.log(`Pagamento avulso recebido (não assinatura): ${paymentId}`);
+      this.logger.log(`One-time payment received (not subscription): ${paymentId}`);
+    }
+  }
+
+  private validateSignature(body: any, headers: any): boolean {
+    const signature = headers['x-signature'];
+    if (!signature) {
+      this.logger.warn('Missing x-signature header');
+      return false;
+    }
+
+    const secret = process.env.MP_WEBHOOK_SECRET;
+    if (!secret) {
+      this.logger.error('MP_WEBHOOK_SECRET not configured');
+      return false;
+    }
+
+    const parts = signature.split(',');
+    const tsPart = parts.find(p => p.startsWith('ts='));
+    const hashPart = parts.find(p => p.startsWith('v1='));
+    if (!tsPart || !hashPart) {
+      return false;
+    }
+
+    const ts = tsPart.split('=')[1];
+    const receivedHash = hashPart.split('=')[1];
+    const manifest = `id:${body.id};` + (body.type ? `type:${body.type};` : '') + `date:${body.date};`;
+    const hmac = createHmac('sha256', secret);
+    hmac.update(`${ts}:${manifest}`);
+    const expectedHash = hmac.digest('hex');
+
+    try {
+      return timingSafeEqual(Buffer.from(receivedHash), Buffer.from(expectedHash));
+    } catch {
+      return false;
     }
   }
 }

@@ -1,4 +1,3 @@
-// apps/api/src/payments/payment.service.ts
 import {
   Injectable,
   Logger,
@@ -21,15 +20,15 @@ export class PaymentService implements OnModuleInit {
     const accessToken = this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
 
     if (!accessToken) {
-      this.logger.error('❌ Mercado Pago Access Token não configurado');
-      throw new Error('Mercado Pago Access Token não configurado');
+      this.logger.error('Mercado Pago Access Token not configured');
+      throw new Error('Mercado Pago Access Token not configured');
     }
 
     this.client = new MercadoPagoConfig({ accessToken });
     this.preApproval = new PreApproval(this.client);
     this.payment = new Payment(this.client);
 
-    this.logger.log('✅ Mercado Pago inicializado com sucesso');
+    this.logger.log('Mercado Pago initialized successfully');
   }
 
   async createSubscription(params: {
@@ -38,13 +37,11 @@ export class PaymentService implements OnModuleInit {
     backUrl: string;
   }): Promise<{ checkoutLink: string; preapprovalId: string }> {
     try {
-      this.logger.log(`🔵 Criando assinatura REAL para ${params.email}`);
+      this.logger.log(`Creating subscription for ${params.email}`);
 
       if (!params.email) {
-        throw new BadRequestException('Email é obrigatório');
+        throw new BadRequestException('Email is required');
       }
-
-      console.log('📦 PARAMS RECEBIDOS:', JSON.stringify(params, null, 2));
 
       const response = await this.preApproval.create({
         body: {
@@ -58,70 +55,84 @@ export class PaymentService implements OnModuleInit {
             transaction_amount: 149.9,
             currency_id: 'BRL',
           },
-          status: 'pending',
         },
       });
-
-      console.log('🔥 RESPOSTA COMPLETA MP:', JSON.stringify(response, null, 2));
 
       const preapprovalId = response.id;
       const checkoutLink = response.init_point;
 
       if (!checkoutLink) {
-        this.logger.error('❌ Mercado Pago não retornou checkoutLink');
-        console.log('🔥 RESPONSE MP:', response);
-        throw new BadRequestException('Mercado Pago não retornou checkoutLink');
+        this.logger.error('Mercado Pago did not return checkout link');
+        throw new BadRequestException('Mercado Pago did not return checkout link');
       }
 
-      this.logger.log(`✅ Assinatura criada com sucesso: ${preapprovalId}`);
-      this.logger.log(`🔗 Checkout Link: ${checkoutLink}`);
+      this.logger.log(
+        `Subscription created: ${JSON.stringify({
+          id: preapprovalId,
+          status: response.status,
+          init_point: checkoutLink,
+          payer_email: params.email,
+          external_reference: params.externalReference,
+        })}`,
+      );
 
       return { checkoutLink, preapprovalId };
     } catch (error: any) {
-      this.logger.error(`❌ Erro ao criar assinatura Mercado Pago`, error);
-      console.log('🔥 ERRO COMPLETO MP:', JSON.stringify(error, null, 2));
-      throw new BadRequestException(error?.message || 'Falha ao criar assinatura no Mercado Pago');
+      this.logger.error(`Failed to create subscription: ${error.message}`);
+      throw new BadRequestException(error?.message || 'Failed to create subscription');
     }
   }
 
   async getSubscription(preapprovalId: string): Promise<any> {
     try {
-      this.logger.log(`🔎 Consultando assinatura: ${preapprovalId}`);
+      this.logger.log(`Fetching subscription: ${preapprovalId}`);
       const response = await this.preApproval.get({ id: preapprovalId });
-      console.log('📄 RESPOSTA CONSULTA MP:', JSON.stringify(response, null, 2));
+      this.logger.log(
+        `Subscription fetched: ${JSON.stringify({
+          id: response.id,
+          status: response.status,
+          payer_email: response.payer_email,
+          external_reference: response.external_reference,
+          next_payment_date: response.next_payment_date,
+        })}`,
+      );
       return response;
     } catch (error: any) {
-      this.logger.error(`❌ Erro ao consultar assinatura ${preapprovalId}`, error);
-      console.log('🔥 ERRO CONSULTA MP:', JSON.stringify(error, null, 2));
-      throw new BadRequestException('Assinatura não encontrada');
+      this.logger.error(`Failed to fetch subscription ${preapprovalId}: ${error.message}`);
+      throw new BadRequestException('Subscription not found');
     }
   }
 
   async getPayment(paymentId: string): Promise<any> {
     try {
-      this.logger.log(`💰 Buscando pagamento: ${paymentId}`);
+      this.logger.log(`Fetching payment: ${paymentId}`);
       const response = await this.payment.get({ id: paymentId });
-      console.log('📄 RESPOSTA PAGAMENTO MP:', JSON.stringify(response, null, 2));
+      this.logger.log(
+        `Payment fetched: ${JSON.stringify({
+          id: response.id,
+          status: response.status,
+          type: response.payment_type_id,
+          subscription_id: response.subscription_id,
+        })}`,
+      );
       return response;
     } catch (error: any) {
-      this.logger.error(`❌ Erro ao consultar pagamento ${paymentId}`, error);
-      console.log('🔥 ERRO CONSULTA PAGAMENTO MP:', JSON.stringify(error, null, 2));
+      this.logger.error(`Failed to fetch payment ${paymentId}: ${error.message}`);
       return null;
     }
   }
 
   async cancelSubscription(preapprovalId: string): Promise<boolean> {
     try {
-      this.logger.log(`🛑 Cancelando assinatura: ${preapprovalId}`);
+      this.logger.log(`Cancelling subscription: ${preapprovalId}`);
       await this.preApproval.update({
         id: preapprovalId,
         body: { status: 'cancelled' },
       });
-      this.logger.log(`✅ Assinatura cancelada: ${preapprovalId}`);
+      this.logger.log(`Subscription cancelled: ${preapprovalId}`);
       return true;
     } catch (error: any) {
-      this.logger.error(`❌ Erro ao cancelar assinatura`, error);
-      console.log('🔥 ERRO CANCELAMENTO MP:', JSON.stringify(error, null, 2));
+      this.logger.error(`Failed to cancel subscription ${preapprovalId}: ${error.message}`);
       return false;
     }
   }

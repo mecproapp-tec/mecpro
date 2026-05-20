@@ -205,7 +205,7 @@ model Subscription {
   price                 Decimal            @db.Decimal(10, 2)
   status                SubscriptionStatus
   gateway               String
-  gatewaySubscriptionId String?
+  gatewaySubscriptionId String?            @unique
   startDate             DateTime
   endDate               DateTime?
   createdAt             DateTime           @default(now())
@@ -237,12 +237,12 @@ model Payment {
 model PendingSubscription {
   id             String   @id @default(uuid())
   email          String   @unique
-  subscriptionId String?
+  subscriptionId String?  @unique
   planId         String
   trialEndsAt    DateTime
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  status         String   @default("pending")
+  status         String   @default("PENDING")
   tenantId       String?
   officeName     String?
   documentType   String?
@@ -254,6 +254,7 @@ model PendingSubscription {
 
   @@index([email, status])
   @@index([trialEndsAt])
+  @@index([subscriptionId])
 }
 
 model PublicShare {

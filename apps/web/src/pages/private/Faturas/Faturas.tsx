@@ -10,7 +10,7 @@ import {
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { getInvoices, deleteInvoice, updateInvoice, type Invoice, resendInvoicePdf } from "../../../services/invoices";
-import { getClientById, getVehicleDisplay, type Client } from "../../../services/clients";
+import { getClientById, type Client } from "../../../services/clients";
 import api from "../../../services/api";
 
 type FilterType = "todos" | "PENDING" | "PAID" | "CANCELED";
@@ -323,7 +323,7 @@ export default function Faturas() {
                   <th style={styles.th}>Pagamento</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Ações</th>
-                </td>
+                </tr>
               </thead>
               <tbody>
                 {faturasFiltradas.map((f, index) => {
@@ -348,7 +348,7 @@ export default function Faturas() {
                           <option value="PAID">Paga</option>
                           <option value="CANCELED">Cancelada</option>
                         </select>
-                       </td>
+                      </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
                         <div style={styles.actions}>
                           <button onClick={() => navigate(`/clientes/ver/${f.clientId}`)} style={styles.actionButton} title="Ver cliente">
@@ -364,7 +364,7 @@ export default function Faturas() {
                             <FiMessageCircle size={16} />
                           </button>
                         </div>
-                       </td>
+                      </td>
                     </tr>
                   );
                 })}
@@ -422,7 +422,7 @@ const styles = {
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     margin: 0,
-    letterSpacing: "-0.02em", // ✅ Adicionado para igualar ao orçamento
+    letterSpacing: "-0.02em",
   },
   headerRight: { display: "flex", gap: "16px", alignItems: "center" },
   totalBox: {
