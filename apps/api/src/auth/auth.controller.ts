@@ -11,11 +11,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
-
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterAdminDto } from './dto/register-admin.dto';
-
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -101,7 +99,6 @@ export class AuthController {
     };
   }
 
-  // 🔥 NOVA ROTA
   @Public()
   @Post('complete-registration')
   @HttpCode(HttpStatus.OK)

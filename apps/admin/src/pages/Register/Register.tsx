@@ -7,6 +7,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState<"ADMIN" | "SUPER_ADMIN">("ADMIN");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await api.post("/auth/register-admin", { name, email, password });
+      await api.post("/auth/register-admin", { name, email, password, role });
       setSuccess("Cadastro realizado! Redirecionando...");
       setTimeout(() => navigate("/login"), 2000);
     } catch (err: any) {
@@ -38,7 +39,9 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-blackBg flex items-center justify-center p-4">
       <div className="bg-gray900 p-8 rounded-xl border border-gray800 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-neonBlue mb-6 text-center">Cadastro de Administrador</h1>
+        <h1 className="text-3xl font-bold text-neonBlue mb-6 text-center">
+          Cadastro de Administrador
+        </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
@@ -73,6 +76,17 @@ export default function Register() {
             className="w-full px-4 py-3 bg-gray800 border border-gray700 rounded-lg text-white"
             required
           />
+          <div>
+            <label className="block text-gray-400 mb-1">Tipo de administrador</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as "ADMIN" | "SUPER_ADMIN")}
+              className="w-full px-4 py-3 bg-gray800 border border-gray700 rounded-lg text-white"
+            >
+              <option value="ADMIN">Admin (comum)</option>
+              <option value="SUPER_ADMIN">Super Admin</option>
+            </select>
+          </div>
           {error && <p className="text-red-500 text-sm">{error}</p>}
           {success && <p className="text-green-500 text-sm">{success}</p>}
           <button

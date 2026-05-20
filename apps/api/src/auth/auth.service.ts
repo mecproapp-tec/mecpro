@@ -1,4 +1,3 @@
-// apps/api/src/auth/auth.service.ts
 import {
   Injectable,
   UnauthorizedException,
@@ -158,6 +157,17 @@ export class AuthService {
     });
     if (existingUser) throw new BadRequestException('Email já cadastrado');
 
+    let requestedRole = data.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'ADMIN';
+
+    if (requestedRole === 'SUPER_ADMIN') {
+      const existingSuperAdmin = await this.prisma.user.findFirst({
+        where: { role: 'SUPER_ADMIN' },
+      });
+      if (existingSuperAdmin) {
+        throw new BadRequestException('Já existe um Super Admin. Apenas administradores podem criar novos Super Admins.');
+      }
+    }
+
     const ADMIN_TENANT_ID = '00000000-0000-0000-0000-000000000001';
     let tenant = await this.prisma.tenant.findUnique({
       where: { id: ADMIN_TENANT_ID },
@@ -184,7 +194,7 @@ export class AuthService {
         name: data.name,
         email: data.email,
         password: hashedPassword,
-        role: 'SUPER_ADMIN',
+        role: requestedRole as any,
         tenantId: tenant.id,
         status: 'ACTIVE',
       },
@@ -192,7 +202,12 @@ export class AuthService {
 
     return {
       message: 'Administrador cadastrado com sucesso',
-      user,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     };
   }
 
@@ -362,9 +377,6 @@ export class AuthService {
     };
   }
 
-  // =====================================================
-  //  NOVO MÉTODO - completeRegistration
-  // =====================================================
   async completeRegistration(token: string, password: string) {
     const tenant = await this.prisma.tenant.findFirst({
       where: {
