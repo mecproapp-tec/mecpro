@@ -23,63 +23,72 @@ import { TenantStatus } from '@prisma/client';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, SessionGuard, RolesGuard)
-@Roles('SUPER_ADMIN')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('dashboard')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getDashboard() {
     return this.adminService.getDashboard();
   }
 
   @Get('tenants')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getTenants(@Query() query: any) {
     return this.adminService.getTenants(query);
   }
 
   @Get('tenants/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getTenant(@Param('id') id: string) {
     return this.adminService.getTenant(id);
   }
 
   @Put('tenants/:id/status')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async updateTenantStatus(@Param('id') id: string, @Body('status') status: TenantStatus) {
     return this.adminService.updateTenantStatus(id, status);
   }
 
   @Delete('tenants/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteTenant(@Param('id') id: string) {
     await this.adminService.deleteTenant(id);
   }
 
   @Get('financial/summary')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getFinancialSummary(@Query() query: any) {
     return this.adminService.getFinancialSummary(query);
   }
 
-  // ==================== CLIENTES ====================
   @Get('clients')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getAllClients(@Req() req: Request, @Query() query: any) {
     return this.adminService.getAllClients((req as any).user, query);
   }
 
   @Get('clients/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getClientById(@Param('id') id: string) {
     return this.adminService.getClientById(Number(id));
   }
 
   @Put('clients/:id/block')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async blockClient(@Param('id') id: string) {
     return this.adminService.blockClient(Number(id));
   }
 
   @Put('clients/:id/activate')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async activateClient(@Param('id') id: string) {
     return this.adminService.activateClient(Number(id));
   }
 
   @Post('clients/:id/send-message')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async sendMessageToClient(
     @Param('id') id: string,
     @Body() body: { subject: string; message: string }
@@ -87,13 +96,14 @@ export class AdminController {
     return this.adminService.sendMessageToClient(Number(id), body);
   }
 
-  // ==================== ORÇAMENTOS ====================
   @Get('estimates')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getAllEstimates(@Req() req: Request, @Query() query: any) {
     return this.adminService.getAllEstimates((req as any).user, query);
   }
 
   @Get('estimates/:id/pdf')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getEstimatePdf(@Param('id') id: string, @Res() res: Response) {
     const pdfBuffer = await this.adminService.getEstimatePdf(Number(id));
     res.set({
@@ -103,13 +113,14 @@ export class AdminController {
     res.send(pdfBuffer);
   }
 
-  // ==================== FATURAS ====================
   @Get('invoices')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getAllInvoices(@Req() req: Request, @Query() query: any) {
     return this.adminService.getAllInvoices((req as any).user, query);
   }
 
   @Get('invoices/:id/pdf')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getInvoicePdf(@Param('id') id: string, @Res() res: Response) {
     const pdfBuffer = await this.adminService.getInvoicePdf(Number(id));
     res.set({
@@ -119,61 +130,69 @@ export class AdminController {
     res.send(pdfBuffer);
   }
 
-  // ==================== USUÁRIOS ====================
   @Get('users')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getAllUsers(@Query() query: any) {
     return this.adminService.getAllUsers(query);
   }
 
   @Put('users/:id/block')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async blockUser(@Param('id') id: string) {
     return this.adminService.blockUser(Number(id));
   }
 
   @Put('users/:id/activate')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async activateUser(@Param('id') id: string) {
     return this.adminService.activateUser(Number(id));
   }
 
-  // ==================== NOTIFICAÇÕES ====================
   @Post('notifications/send')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async sendNotification(@Body() body: any) {
     return this.adminService.sendNotification(body);
   }
 
   @Post('notifications/schedule')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async scheduleNotification(@Body() body: any) {
     return this.adminService.scheduleNotification(body);
   }
 
   @Get('notifications')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getNotifications() {
     return this.adminService.getNotifications();
   }
 
   @Put('notifications/:id/read')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async markAsRead(@Param('id') id: string) {
     return this.adminService.markAsRead(Number(id));
   }
 
   @Put('notifications/read-all')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async markAllAsRead() {
     return this.adminService.markAllAsRead();
   }
 
   @Delete('notifications/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteNotification(@Param('id') id: string) {
     await this.adminService.deleteNotification(Number(id));
   }
 
-  // ==================== MENSAGENS DE CONTATO ====================
   @Get('contact')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async getAllContactMessages(@Query() query: any) {
     return this.adminService.getAllContactMessages(query);
   }
 
   @Put('contact/:id/reply')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   async replyToContactMessage(
     @Param('id') id: string,
     @Body() body: { reply: string }
@@ -182,8 +201,40 @@ export class AdminController {
   }
 
   @Delete('contact/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteContactMessage(@Param('id') id: string) {
     await this.adminService.deleteContactMessage(Number(id));
+  }
+
+  @Get('admins')
+  @Roles('SUPER_ADMIN')
+  async getAdmins(@Query() query: any) {
+    return this.adminService.getAdmins(query);
+  }
+
+  @Put('admins/:id/block')
+  @Roles('SUPER_ADMIN')
+  async blockAdmin(@Param('id') id: string) {
+    return this.adminService.blockAdmin(Number(id));
+  }
+
+  @Put('admins/:id/activate')
+  @Roles('SUPER_ADMIN')
+  async activateAdmin(@Param('id') id: string) {
+    return this.adminService.activateAdmin(Number(id));
+  }
+
+  @Post('admins/:id/reset-password')
+  @Roles('SUPER_ADMIN')
+  async resetAdminPassword(@Param('id') id: string) {
+    return this.adminService.resetAdminPassword(Number(id));
+  }
+
+  @Delete('admins/:id')
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAdmin(@Param('id') id: string) {
+    await this.adminService.deleteAdmin(Number(id));
   }
 }

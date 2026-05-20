@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
-import { TenantStatus, ClientStatus, UserStatus } from '@prisma/client';
+import { TenantStatus, ClientStatus, UserStatus, UserRole } from '@prisma/client';
 import { InvoicesService } from '../invoices/invoices.service';
 import { EstimatesService } from '../estimates/estimates.service';
 import { PdfService } from '../pdf/pdf.service';
 import { MailService } from '../mail/mail.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AdminService {
@@ -73,7 +74,6 @@ export class AdminService {
     });
     if (!tenant) throw new NotFoundException('Tenant não encontrado');
 
-    // 🔥 Converte os totais de Decimal para Number (resolve erro .toFixed)
     if (tenant.estimates) {
       tenant.estimates = tenant.estimates.map((e: any) => ({
         ...e,
@@ -101,16 +101,15 @@ export class AdminService {
     return { message: 'Implementar resumo financeiro' };
   }
 
-  // ==================== CLIENTES ====================
   async getAllClients(user: any, query: { search?: string; tenantId?: string }) {
     const where: any = {};
 
-    if (user.role !== 'SUPER_ADMIN') {
-      where.tenantId = user.tenantId;
+    if (user.role === 'ADMIN') {
+      if (query.tenantId) where.tenantId = query.tenantId;
+    } else if (user.role === 'SUPER_ADMIN') {
+      if (query.tenantId) where.tenantId = query.tenantId;
     }
-    if (query.tenantId && user.role === 'SUPER_ADMIN') {
-      where.tenantId = query.tenantId;
-    }
+
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
@@ -174,22 +173,18 @@ export class AdminService {
       await this.mailService.sendEmail(client.user.email, data.subject, data.message).catch(err =>
         console.error('Erro ao enviar e-mail:', err)
       );
-    } else {
-      console.log(`[EMAIL] Cliente ${client.name} (${client.tenantId}) não possui email.`);
     }
 
     return { success: true, message: 'Mensagem enviada com sucesso' };
   }
 
-  // ==================== ORÇAMENTOS ====================
   async getAllEstimates(user: any, query: { status?: string; tenantId?: string }) {
     const where: any = {};
 
-    if (user.role !== 'SUPER_ADMIN') {
-      where.tenantId = user.tenantId;
-    }
-    if (query.tenantId && user.role === 'SUPER_ADMIN') {
-      where.tenantId = query.tenantId;
+    if (user.role === 'ADMIN') {
+      if (query.tenantId) where.tenantId = query.tenantId;
+    } else if (user.role === 'SUPER_ADMIN') {
+      if (query.tenantId) where.tenantId = query.tenantId;
     }
     if (query.status) where.status = query.status;
 
@@ -215,15 +210,13 @@ export class AdminService {
     return this.pdfService.generateEstimatePdf(estimate);
   }
 
-  // ==================== FATURAS ====================
   async getAllInvoices(user: any, query: { status?: string; tenantId?: string }) {
     const where: any = {};
 
-    if (user.role !== 'SUPER_ADMIN') {
-      where.tenantId = user.tenantId;
-    }
-    if (query.tenantId && user.role === 'SUPER_ADMIN') {
-      where.tenantId = query.tenantId;
+    if (user.role === 'ADMIN') {
+      if (query.tenantId) where.tenantId = query.tenantId;
+    } else if (user.role === 'SUPER_ADMIN') {
+      if (query.tenantId) where.tenantId = query.tenantId;
     }
     if (query.status) where.status = query.status;
 
@@ -249,7 +242,6 @@ export class AdminService {
     return this.pdfService.generateInvoicePdf(invoice);
   }
 
-  // ==================== USUÁRIOS ====================
   async getAllUsers(query: { search?: string; role?: string }) {
     const where: any = {};
     if (query.search) {
@@ -289,7 +281,6 @@ export class AdminService {
     });
   }
 
-  // ==================== NOTIFICAÇÕES ====================
   async sendNotification(data: { title: string; message: string; target: string; tenantIds?: string[] }) {
     if (data.target === 'all') {
       const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
@@ -337,7 +328,6 @@ export class AdminService {
     await this.prisma.notification.delete({ where: { id } });
   }
 
-  // ==================== MENSAGENS DE CONTATO ====================
   async getAllContactMessages(query: { status?: string; search?: string }) {
     const where: any = {};
     if (query.status && query.status !== 'all') where.status = query.status;
@@ -377,5 +367,79 @@ export class AdminService {
 
   async deleteContactMessage(id: number) {
     await this.prisma.contactMessage.delete({ where: { id } });
+  }
+
+  async getAdmins(query: { search?: string }) {
+    const where: any = { role: 'ADMIN' };
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { email: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+    return this.prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async blockAdmin(id: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Administrador não encontrado');
+    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        status: UserStatus.BLOCKED,
+        tokenVersion: { increment: 1 },
+      },
+    });
+  }
+
+  async activateAdmin(id: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Administrador não encontrado');
+    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        status: UserStatus.ACTIVE,
+        tokenVersion: { increment: 1 },
+      },
+    });
+  }
+
+  async resetAdminPassword(id: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Administrador não encontrado');
+    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+
+    const newPassword = Math.random().toString(36).slice(-8);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        password: hashedPassword,
+        tokenVersion: { increment: 1 },
+      },
+    });
+
+    if (user.email) {
+      await this.mailService.sendEmail(
+        user.email,
+        'Nova senha - MecPro Admin',
+        `Sua nova senha para acessar o painel administrativo é: ${newPassword}\n\nRecomendamos alterá-la após o primeiro acesso.`
+      ).catch(err => console.error('Erro ao enviar e-mail:', err));
+    }
+
+    return { success: true, message: 'Senha resetada e enviada por e-mail' };
+  }
+
+  async deleteAdmin(id: number) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Administrador não encontrado');
+    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+    await this.prisma.user.delete({ where: { id } });
   }
 }
