@@ -1,3 +1,4 @@
+// apps/web/src/pages/private/Faturas/NovaFatura.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FiPlus, FiX, FiArrowLeft } from "react-icons/fi";
@@ -19,7 +20,7 @@ export default function NovaFatura() {
   const [clienteSelecionado, setClienteSelecionado] = useState<Client | null>(null);
   const [busca, setBusca] = useState("");
   const [itens, setItens] = useState<Omit<InvoiceItem, "total">[]>([
-    { description: "", quantity: 1, price: 0, issPercent: undefined },
+    { description: "", quantity: 1, price: undefined as unknown as number, issPercent: undefined },
   ]);
   const [status, setStatus] = useState<"PENDING" | "PAID" | "CANCELED">("PENDING");
   const [paymentMethod, setPaymentMethod] = useState<string>("");
@@ -43,8 +44,8 @@ export default function NovaFatura() {
       const itemsFromEstimate = estimateFromState.items.map((item) => ({
         description: item.description,
         quantity: 1,
-        price: item.price,
-        issPercent: item.issPercent,
+        price: item.price !== undefined && item.price !== null ? item.price : undefined,
+        issPercent: item.issPercent !== undefined && item.issPercent !== null ? item.issPercent : undefined,
       }));
       setItens(itemsFromEstimate);
     }
@@ -68,8 +69,8 @@ export default function NovaFatura() {
       setItens(fatura.items.map(({ description, quantity, price, issPercent }) => ({
         description,
         quantity,
-        price,
-        issPercent,
+        price: price !== undefined && price !== null ? price : undefined,
+        issPercent: issPercent !== undefined && issPercent !== null ? issPercent : undefined,
       })));
       setStatus(fatura.status);
       setPaymentMethod(fatura.paymentMethod || "");
@@ -79,7 +80,7 @@ export default function NovaFatura() {
   };
 
   const handleAddItem = () => {
-    setItens([...itens, { description: "", quantity: 1, price: 0, issPercent: undefined }]);
+    setItens([...itens, { description: "", quantity: 1, price: undefined as unknown as number, issPercent: undefined }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -92,10 +93,15 @@ export default function NovaFatura() {
     value: string | number
   ) => {
     const novos = [...itens];
-    if (field === "quantity" || field === "price") {
-      novos[index][field] = Number(value) || 0;
+    if (field === "quantity") {
+      const numValue = value === "" ? 1 : Number(value);
+      novos[index][field] = isNaN(numValue) ? 1 : numValue;
+    } else if (field === "price") {
+      const numValue = value === "" ? undefined : Number(value);
+      novos[index].price = (numValue === undefined || isNaN(numValue)) ? undefined : numValue;
     } else if (field === "issPercent") {
-      novos[index].issPercent = value === "" ? undefined : Number(value);
+      const numValue = value === "" || value === undefined ? undefined : Number(value);
+      novos[index].issPercent = numValue;
     } else {
       novos[index][field] = value as string;
     }
@@ -103,8 +109,10 @@ export default function NovaFatura() {
   };
 
   const calcularTotalItem = (item: typeof itens[0]) => {
-    const iss = item.issPercent ? item.price * (item.issPercent / 100) : 0;
-    return (item.price + iss) * item.quantity;
+    const price = item.price || 0;
+    const quantity = item.quantity || 1;
+    const iss = item.issPercent ? price * (item.issPercent / 100) : 0;
+    return (price + iss) * quantity;
   };
 
   const totalGeral = itens.reduce((acc, item) => acc + calcularTotalItem(item), 0);
@@ -120,8 +128,8 @@ export default function NovaFatura() {
       clientId: clienteSelecionado.id,
       items: itens.map(({ description, quantity, price, issPercent }) => ({
         description,
-        quantity,
-        price,
+        quantity: quantity || 1,
+        price: price || 0,
         issPercent: issPercent || 0,
       })),
       status,
@@ -161,7 +169,6 @@ export default function NovaFatura() {
       }}
     >
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-        {/* Header com ícone e título - mesmo espaçamento do orçamento */}
         <div style={{ display: "flex", alignItems: "center", marginBottom: "40px" }}>
           <button
             onClick={() => navigate("/faturas")}
@@ -200,7 +207,6 @@ export default function NovaFatura() {
           </h1>
         </div>
 
-        {/* Card principal - mesmo padding e bordas do orçamento */}
         <div
           style={{
             background: "#111",
@@ -225,7 +231,6 @@ export default function NovaFatura() {
           )}
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-            {/* Campo Cliente - mesmo estilo do orçamento */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Cliente (nome ou placa)
@@ -334,7 +339,6 @@ export default function NovaFatura() {
               )}
             </div>
 
-            {/* Status - mesmo espaçamento vertical */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Status
@@ -361,7 +365,6 @@ export default function NovaFatura() {
               </select>
             </div>
 
-            {/* Forma de Pagamento */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Forma de Pagamento
@@ -390,7 +393,6 @@ export default function NovaFatura() {
               </select>
             </div>
 
-            {/* Itens da Fatura - mesmo layout do orçamento */}
             <div>
               <label style={{ display: "block", marginBottom: "12px", fontWeight: "600", color: "#a0a0a0" }}>
                 Itens da Fatura
@@ -438,7 +440,7 @@ export default function NovaFatura() {
                   <input
                     type="number"
                     placeholder="Preço"
-                    value={item.price}
+                    value={item.price === undefined ? "" : item.price}
                     onChange={(e) => handleItemChange(index, "price", e.target.value)}
                     style={{
                       width: "120px",
@@ -452,7 +454,6 @@ export default function NovaFatura() {
                     }}
                     min="0"
                     step="0.01"
-                    required
                   />
                   <select
                     value={item.issPercent ?? ""}
@@ -539,12 +540,10 @@ export default function NovaFatura() {
               </button>
             </div>
 
-            {/* Total - mesmo tamanho e cor */}
             <div style={{ textAlign: "right", fontSize: "28px", fontWeight: "700", color: "#00e5ff" }}>
               Total: R$ {totalGeral.toFixed(2)}
             </div>
 
-            {/* Botão submit - mesma altura, padding e efeitos */}
             <button
               type="submit"
               disabled={loading || !clienteSelecionado}

@@ -1,3 +1,4 @@
+// apps/web/src/pages/private/Orcamentos/NovoOrcamento.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FiPlus, FiX, FiArrowLeft } from "react-icons/fi";
@@ -21,7 +22,6 @@ interface CreateEstimateData {
   paymentMethod?: string;
 }
 
-// Função auxiliar para obter data local no formato YYYY-MM-DD
 function getLocalDateString(date: Date = new Date()): string {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -38,9 +38,8 @@ export default function NovoOrcamento() {
   const [clienteSelecionado, setClienteSelecionado] = useState<Client | null>(null);
   const [busca, setBusca] = useState("");
   const [itens, setItens] = useState<Omit<EstimateItem, "total">[]>([
-    { description: "", quantity: 1, price: 0, issPercent: undefined },
+    { description: "", quantity: 1, price: undefined as unknown as number, issPercent: undefined },
   ]);
-  // CORREÇÃO: usar getLocalDateString() em vez de toISOString()
   const [dataOrcamento, setDataOrcamento] = useState(getLocalDateString());
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -74,14 +73,11 @@ export default function NovoOrcamento() {
         orcamento.items.map((item: any) => ({
           description: item.description,
           quantity: item.quantity ?? 1,
-          price: typeof item.price === 'string' ? parseFloat(item.price) : (item.price || 0),
+          price: item.price !== undefined && item.price !== null ? Number(item.price) : undefined,
           issPercent: item.issPercent !== undefined && item.issPercent !== null ? Number(item.issPercent) : undefined,
         }))
       );
-      // CORREÇÃO: também usar getLocalDateString como fallback
-      setDataOrcamento(
-        orcamento.date?.split("T")[0] || getLocalDateString()
-      );
+      setDataOrcamento(orcamento.date?.split("T")[0] || getLocalDateString());
       setPaymentMethod(orcamento.paymentMethod || "");
     } catch (err: any) {
       setError(err.response?.data?.message || "Erro ao carregar orçamento");
@@ -89,7 +85,7 @@ export default function NovoOrcamento() {
   };
 
   const handleAddItem = () => {
-    setItens([...itens, { description: "", quantity: 1, price: 0, issPercent: undefined }]);
+    setItens([...itens, { description: "", quantity: 1, price: undefined as unknown as number, issPercent: undefined }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -102,9 +98,12 @@ export default function NovoOrcamento() {
     value: string | number
   ) => {
     const novos = [...itens];
-    if (field === "quantity" || field === "price") {
-      const numValue = value === "" ? 0 : Number(value);
-      novos[index][field] = isNaN(numValue) ? 0 : numValue;
+    if (field === "quantity") {
+      const numValue = value === "" ? 1 : Number(value);
+      novos[index][field] = isNaN(numValue) ? 1 : numValue;
+    } else if (field === "price") {
+      const numValue = value === "" ? undefined : Number(value);
+      novos[index].price = (numValue === undefined || isNaN(numValue)) ? undefined : numValue;
     } else if (field === "issPercent") {
       const numValue = value === "" || value === undefined ? undefined : Number(value);
       novos[index].issPercent = numValue;
@@ -137,7 +136,7 @@ export default function NovoOrcamento() {
       return;
     }
 
-    if (itens.length === 0 || itens.every(i => i.price <= 0)) {
+    if (itens.length === 0 || itens.every(i => !i.price || i.price <= 0)) {
       setError("Adicione pelo menos um item válido (preço maior que zero)");
       return;
     }
@@ -151,7 +150,7 @@ export default function NovoOrcamento() {
       items: itens.map(({ description, quantity, price, issPercent }) => ({
         description: description.trim(),
         quantity: quantity || 1,
-        price: typeof price === 'string' ? parseFloat(price) : price,
+        price: price || 0,
         issPercent: issPercent ? Number(issPercent) : 0,
       })),
       paymentMethod: paymentMethod || undefined,
@@ -455,7 +454,7 @@ export default function NovoOrcamento() {
                   <input
                     type="number"
                     placeholder="Preço"
-                    value={item.price}
+                    value={item.price === undefined ? "" : item.price}
                     onChange={(e) => handleItemChange(index, "price", e.target.value)}
                     style={{
                       width: "120px",
@@ -469,7 +468,6 @@ export default function NovoOrcamento() {
                     }}
                     min="0"
                     step="0.01"
-                    required
                   />
                   <select
                     value={item.issPercent ?? ""}
