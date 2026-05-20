@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('❌ Erro capturado pelo boundary:', error, info);
     
-    
+    // 🔥 Melhoria: Log para serviço de monitoramento (opcional)
     if (process.env.NODE_ENV === 'production') {
       // Enviar para serviço de tracking (Sentry, etc.)
       // sendToErrorTracking(error, info);

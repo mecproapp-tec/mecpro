@@ -416,7 +416,7 @@ enum TenantStatus {
 enum UserRole {
   OWNER
   ADMIN
-  // SUPER_ADMIN removido – agora apenas a model SuperAdmin representa o super administrador
+  SUPER_ADMIN
 }
 
 enum UserStatus {

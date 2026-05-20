@@ -1,3 +1,4 @@
+// src/auth/guards/jwt.strategy.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -13,29 +14,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') || 'SUPER_SECRET_KEY',
+      secretOrKey:
+        configService.get<string>('JWT_SECRET') || 'SUPER_SECRET_KEY',
     });
   }
 
   async validate(payload: any) {
     if (!payload) {
       throw new UnauthorizedException('Token inválido');
-    }
-
-    if (payload.sub && typeof payload.sub === 'string' && payload.sub.startsWith('sa_')) {
-      const superAdminId = payload.sub.substring(3);
-      const superAdmin = await this.prisma.superAdmin.findUnique({
-        where: { id: superAdminId },
-      });
-      if (!superAdmin) {
-        throw new UnauthorizedException('Super Admin não encontrado');
-      }
-      return {
-        id: superAdmin.id,
-        email: superAdmin.email,
-        isSuperAdmin: true,
-        role: 'SUPER_ADMIN',
-      };
     }
 
     const user = await this.prisma.user.findUnique({
@@ -69,7 +55,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       tenantId: user.tenantId,
       sessionToken: payload.sessionToken,
-      isSuperAdmin: false,
     };
   }
 }
