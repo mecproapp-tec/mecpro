@@ -14,6 +14,8 @@ model Tenant {
   documentNumber             String                  @unique
   cep                        String
   address                    String
+  number                     String?
+  complement                 String?
   email                      String                  @unique
   phone                      String
   logoUrl                    String?
@@ -21,12 +23,10 @@ model Tenant {
   trialEndsAt                DateTime?
   createdAt                  DateTime                @default(now())
   updatedAt                  DateTime                @updatedAt
-  paymentStatus              String?                 @default("pending")
   subscriptionId             String?                 @unique
-  complement                 String?
-  number                     String?
   registrationToken          String?
   registrationTokenExpiresAt DateTime?
+  paymentStatus              String?                 @default("pending")
   appointments               Appointment[]
   Budget                     Budget[]
   clients                    Client[]
@@ -49,15 +49,15 @@ model Tenant {
 }
 
 model User {
+  id            Int            @id @default(autoincrement())
   name          String
   email         String         @unique
   password      String
   role          UserRole       @default(OWNER)
+  status        UserStatus     @default(ACTIVE)
   tenantId      String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  id            Int            @id @default(autoincrement())
-  status        UserStatus     @default(ACTIVE)
   tokenVersion  Int            @default(0)
   paymentStatus String?        @default("pending")
   clients       Client[]
@@ -129,7 +129,7 @@ model Estimate {
   pdfUrl            String?        @map("pdf_url")
   pdfKey            String?        @map("pdf_key")
   deletedAt         DateTime?
-  paymentMethod     PaymentMethod? 
+  paymentMethod     PaymentMethod?
   client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             EstimateItem[]
@@ -157,25 +157,25 @@ model EstimateItem {
 
 model Invoice {
   tenantId          String
-  total             Decimal       @db.Decimal(10, 2)
-  status            InvoiceStatus @default(PENDING)
-  createdAt         DateTime      @default(now())
+  total             Decimal        @db.Decimal(10, 2)
+  status            InvoiceStatus  @default(PENDING)
+  createdAt         DateTime       @default(now())
   clientId          Int
-  number            String        @unique
-  id                Int           @id @default(autoincrement())
-  estimateId        Int?          @unique
-  shareToken        String?       @unique
+  number            String         @unique
+  id                Int            @id @default(autoincrement())
+  estimateId        Int?           @unique
+  shareToken        String?        @unique
   shareTokenExpires DateTime?
-  pdfGeneratedAt    DateTime?     @map("pdf_generated_at")
-  pdfStatus         String?       @default("pending") @map("pdf_status")
-  pdfUrl            String?       @map("pdf_url")
-  pdfKey            String?       @map("pdf_key")
-  updatedAt         DateTime      @updatedAt
+  pdfGeneratedAt    DateTime?      @map("pdf_generated_at")
+  pdfStatus         String?        @default("pending") @map("pdf_status")
+  pdfUrl            String?        @map("pdf_url")
+  pdfKey            String?        @map("pdf_key")
+  updatedAt         DateTime       @updatedAt
   deletedAt         DateTime?
-  paymentMethod     PaymentMethod? 
-  client            Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  estimate          Estimate?     @relation(fields: [estimateId], references: [id])
-  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  paymentMethod     PaymentMethod?
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  estimate          Estimate?      @relation(fields: [estimateId], references: [id])
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items             InvoiceItem[]
 
   @@index([tenantId, status, createdAt])
@@ -239,17 +239,17 @@ model PendingSubscription {
   email          String   @unique
   subscriptionId String?  @unique
   planId         String
+  officeName     String?
+  documentType   String?
+  documentNumber String?
+  phone          String?
+  cep            String?
+  address        String?
   trialEndsAt    DateTime
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   status         String   @default("PENDING")
   tenantId       String?
-  officeName     String?
-  documentType   String?
-  documentNumber String?
-  address        String?
-  cep            String?
-  phone          String?
   tenant         Tenant?  @relation(fields: [tenantId], references: [id])
 
   @@index([email, status])
@@ -354,10 +354,10 @@ model ContactMessage {
 model WhatsappLog {
   id           String    @id @default(uuid())
   tenantId     String
-  type         String // estimate, invoice
+  type         String
   resourceId   Int
   phone        String
-  status       String // SENT, FAILED, DELIVERED, READ
+  status       String
   messageId    String?
   errorMessage String?
   sentAt       DateTime  @default(now())

@@ -112,7 +112,6 @@ export class PaymentService implements OnModuleInit {
           id: response.id,
           status: response.status,
           type: response.payment_type_id,
-          subscription_id: response.subscription_id,
         })}`,
       );
       return response;
