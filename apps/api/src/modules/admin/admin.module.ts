@@ -6,9 +6,17 @@ import { EstimatesModule } from '../estimates/estimates.module';
 import { PdfModule } from '../pdf/pdf.module';
 import { AuthModule } from '../../auth/auth.module';
 import { MailModule } from '../mail/mail.module';
+import { PaymentsModule } from '../../payments/payments.module'; 
 
 @Module({
-  imports: [InvoicesModule, EstimatesModule, PdfModule, AuthModule, MailModule],
+  imports: [
+    InvoicesModule,
+    EstimatesModule,
+    PdfModule,
+    AuthModule,
+    MailModule,
+    PaymentsModule, 
+  ],
   controllers: [AdminController],
   providers: [AdminService],
   exports: [AdminService],

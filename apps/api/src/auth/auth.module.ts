@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { PrismaModule } from '../shared/prisma/prisma.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { NotificationsModule } from '../modules/notifications/notifications.module'; 
 
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -16,8 +17,6 @@ import { JwtStrategy } from './guards/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { SessionGuard } from './guards/session.guard';
 import { BillingGuard } from './guards/billing.guard';
-
-// (opcional)
 import { RolesGuard } from './roles.guard';
 
 @Module({
@@ -25,41 +24,29 @@ import { RolesGuard } from './roles.guard';
     PrismaModule,
     PassportModule,
     ConfigModule,
-
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret:
-          configService.get<string>('JWT_SECRET') ||
-          'SUPER_SECRET_KEY',
+        secret: configService.get<string>('JWT_SECRET') || 'SUPER_SECRET_KEY',
         signOptions: { expiresIn: '7d' },
       }),
     }),
-
     PaymentsModule,
+    NotificationsModule, 
   ],
-
   controllers: [AuthController],
-
   providers: [
     AuthService,
     JwtStrategy,
-
-    // 🔥 GUARDS REGISTRADOS
     JwtAuthGuard,
     SessionGuard,
     BillingGuard,
-
-    // opcional
     RolesGuard,
   ],
-
   exports: [
     AuthService,
     JwtModule,
-
-    // 🔥 EXPORTA PARA OUTROS MÓDULOS
     JwtAuthGuard,
     SessionGuard,
     BillingGuard,
