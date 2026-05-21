@@ -16,7 +16,7 @@ import Estimates from './pages/Estimates/Estimates';
 import Invoices from './pages/Invoices/InvoicesList';
 import Layout from './components/layout/Layout';
 import ContactMessages from './pages/Contact/ContactMessages';
-import PendingAdmins from './pages/Admin/PendingAdmins';
+import PendingAdmins from './pages/admin/PendingAdmins';
 
 function App() {
   return (
