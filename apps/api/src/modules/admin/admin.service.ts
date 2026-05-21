@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { TenantStatus, ClientStatus, UserStatus, UserRole } from '@prisma/client';
 import { InvoicesService } from '../invoices/invoices.service';
@@ -6,6 +6,7 @@ import { EstimatesService } from '../estimates/estimates.service';
 import { PdfService } from '../pdf/pdf.service';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcrypt';
+import { PaymentService } from '../../payments/payment.service';
 
 @Injectable()
 export class AdminService {
@@ -15,6 +16,7 @@ export class AdminService {
     private estimatesService: EstimatesService,
     private pdfService: PdfService,
     private mailService: MailService,
+    private paymentService: PaymentService,
   ) {}
 
   async getDashboard() {
@@ -32,16 +34,7 @@ export class AdminService {
           select: { id: true, name: true, email: true, createdAt: true, status: true },
         }),
       ]);
-
-    return {
-      totalTenants,
-      activeTenants,
-      blockedTenants,
-      totalClients,
-      totalEstimates,
-      totalInvoices,
-      recentTenants,
-    };
+    return { totalTenants, activeTenants, blockedTenants, totalClients, totalEstimates, totalInvoices, recentTenants };
   }
 
   async getTenants(query: { status?: string; search?: string }) {
@@ -55,9 +48,7 @@ export class AdminService {
     }
     return this.prisma.tenant.findMany({
       where,
-      include: {
-        _count: { select: { clients: true, estimates: true, invoices: true } },
-      },
+      include: { _count: { select: { clients: true, estimates: true, invoices: true } } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -73,18 +64,11 @@ export class AdminService {
       },
     });
     if (!tenant) throw new NotFoundException('Tenant não encontrado');
-
     if (tenant.estimates) {
-      tenant.estimates = tenant.estimates.map((e: any) => ({
-        ...e,
-        total: Number(e.total),
-      }));
+      tenant.estimates = tenant.estimates.map((e: any) => ({ ...e, total: Number(e.total) }));
     }
     if (tenant.invoices) {
-      tenant.invoices = tenant.invoices.map((i: any) => ({
-        ...i,
-        total: Number(i.total),
-      }));
+      tenant.invoices = tenant.invoices.map((i: any) => ({ ...i, total: Number(i.total) }));
     }
     return tenant;
   }
@@ -103,13 +87,8 @@ export class AdminService {
 
   async getAllClients(user: any, query: { search?: string; tenantId?: string }) {
     const where: any = {};
-
-    if (user.role === 'ADMIN') {
-      if (query.tenantId) where.tenantId = query.tenantId;
-    } else if (user.role === 'SUPER_ADMIN') {
-      if (query.tenantId) where.tenantId = query.tenantId;
-    }
-
+    if (user.role === 'ADMIN' && query.tenantId) where.tenantId = query.tenantId;
+    else if (user.role === 'SUPER_ADMIN' && query.tenantId) where.tenantId = query.tenantId;
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
@@ -117,7 +96,6 @@ export class AdminService {
         { plate: { contains: query.search, mode: 'insensitive' } },
       ];
     }
-
     const clients = await this.prisma.client.findMany({
       where,
       include: { tenant: { select: { name: true } } },
@@ -138,19 +116,13 @@ export class AdminService {
   async blockClient(id: number) {
     const client = await this.prisma.client.findUnique({ where: { id } });
     if (!client) throw new NotFoundException('Cliente não encontrado');
-    return this.prisma.client.update({
-      where: { id },
-      data: { status: ClientStatus.BLOCKED },
-    });
+    return this.prisma.client.update({ where: { id }, data: { status: ClientStatus.BLOCKED } });
   }
 
   async activateClient(id: number) {
     const client = await this.prisma.client.findUnique({ where: { id } });
     if (!client) throw new NotFoundException('Cliente não encontrado');
-    return this.prisma.client.update({
-      where: { id },
-      data: { status: ClientStatus.ACTIVE },
-    });
+    return this.prisma.client.update({ where: { id }, data: { status: ClientStatus.ACTIVE } });
   }
 
   async sendMessageToClient(clientId: number, data: { subject: string; message: string }) {
@@ -159,46 +131,26 @@ export class AdminService {
       include: { tenant: true, user: true },
     });
     if (!client) throw new NotFoundException('Cliente não encontrado');
-
     await this.prisma.notification.create({
-      data: {
-        tenantId: client.tenantId,
-        title: data.subject,
-        message: data.message,
-        isGlobal: false,
-      },
+      data: { tenantId: client.tenantId, title: data.subject, message: data.message, isGlobal: false },
     });
-
     if (client.user?.email) {
-      await this.mailService.sendEmail(client.user.email, data.subject, data.message).catch(err =>
-        console.error('Erro ao enviar e-mail:', err)
-      );
+      await this.mailService.sendEmail(client.user.email, data.subject, data.message).catch(err => console.error(err));
     }
-
     return { success: true, message: 'Mensagem enviada com sucesso' };
   }
 
   async getAllEstimates(user: any, query: { status?: string; tenantId?: string }) {
     const where: any = {};
-
-    if (user.role === 'ADMIN') {
-      if (query.tenantId) where.tenantId = query.tenantId;
-    } else if (user.role === 'SUPER_ADMIN') {
-      if (query.tenantId) where.tenantId = query.tenantId;
-    }
+    if (user.role === 'ADMIN' && query.tenantId) where.tenantId = query.tenantId;
+    else if (user.role === 'SUPER_ADMIN' && query.tenantId) where.tenantId = query.tenantId;
     if (query.status) where.status = query.status;
-
     const estimates = await this.prisma.estimate.findMany({
       where,
       include: { client: { select: { name: true } }, tenant: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     });
-    return estimates.map(e => ({
-      ...e,
-      total: Number(e.total),
-      clientName: e.client?.name,
-      tenantName: e.tenant?.name,
-    }));
+    return estimates.map(e => ({ ...e, total: Number(e.total), clientName: e.client?.name, tenantName: e.tenant?.name }));
   }
 
   async getEstimatePdf(id: number) {
@@ -212,25 +164,15 @@ export class AdminService {
 
   async getAllInvoices(user: any, query: { status?: string; tenantId?: string }) {
     const where: any = {};
-
-    if (user.role === 'ADMIN') {
-      if (query.tenantId) where.tenantId = query.tenantId;
-    } else if (user.role === 'SUPER_ADMIN') {
-      if (query.tenantId) where.tenantId = query.tenantId;
-    }
+    if (user.role === 'ADMIN' && query.tenantId) where.tenantId = query.tenantId;
+    else if (user.role === 'SUPER_ADMIN' && query.tenantId) where.tenantId = query.tenantId;
     if (query.status) where.status = query.status;
-
     const invoices = await this.prisma.invoice.findMany({
       where,
       include: { client: { select: { name: true } }, tenant: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     });
-    return invoices.map(i => ({
-      ...i,
-      total: Number(i.total),
-      clientName: i.client?.name,
-      tenantName: i.tenant?.name,
-    }));
+    return invoices.map(i => ({ ...i, total: Number(i.total), clientName: i.client?.name, tenantName: i.tenant?.name }));
   }
 
   async getInvoicePdf(id: number) {
@@ -251,53 +193,28 @@ export class AdminService {
       ];
     }
     if (query.role) where.role = query.role;
-    return this.prisma.user.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.prisma.user.findMany({ where, orderBy: { createdAt: 'desc' } });
   }
 
   async blockUser(id: number) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('Usuário não encontrado');
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        status: UserStatus.BLOCKED,
-        tokenVersion: { increment: 1 },
-      },
-    });
+    return this.prisma.user.update({ where: { id }, data: { status: UserStatus.BLOCKED, tokenVersion: { increment: 1 } } });
   }
 
   async activateUser(id: number) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('Usuário não encontrado');
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        status: UserStatus.ACTIVE,
-        tokenVersion: { increment: 1 },
-      },
-    });
+    return this.prisma.user.update({ where: { id }, data: { status: UserStatus.ACTIVE, tokenVersion: { increment: 1 } } });
   }
 
   async sendNotification(data: { title: string; message: string; target: string; tenantIds?: string[] }) {
     if (data.target === 'all') {
       const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
-      const notificationData = tenants.map(t => ({
-        tenantId: t.id,
-        title: data.title,
-        message: data.message,
-        isGlobal: true,
-      }));
+      const notificationData = tenants.map(t => ({ tenantId: t.id, title: data.title, message: data.message, isGlobal: true }));
       await this.prisma.notification.createMany({ data: notificationData });
     } else if (data.tenantIds?.length) {
-      const notificationData = data.tenantIds.map(tenantId => ({
-        tenantId,
-        title: data.title,
-        message: data.message,
-        isGlobal: false,
-      }));
+      const notificationData = data.tenantIds.map(tenantId => ({ tenantId, title: data.title, message: data.message, isGlobal: false }));
       await this.prisma.notification.createMany({ data: notificationData });
     }
     return { success: true };
@@ -348,20 +265,13 @@ export class AdminService {
   async replyToContactMessage(id: number, replyText: string) {
     const message = await this.prisma.contactMessage.findUnique({ where: { id } });
     if (!message) throw new NotFoundException('Mensagem não encontrada');
-
     const updated = await this.prisma.contactMessage.update({
       where: { id },
       data: { reply: replyText, status: 'replied' },
     });
-
     if (message.userEmail) {
-      await this.mailService.sendEmail(
-        message.userEmail,
-        'Resposta do suporte MecPro',
-        `Olá,\n\nSua mensagem foi respondida:\n\n"${replyText}"\n\nAtenciosamente,\nEquipe MecPro`
-      ).catch(err => console.error('Erro ao enviar e-mail de resposta:', err));
+      await this.mailService.sendEmail(message.userEmail, 'Resposta do suporte MecPro', `Olá,\n\nSua mensagem foi respondida:\n\n"${replyText}"\n\nAtenciosamente,\nEquipe MecPro`).catch(err => console.error(err));
     }
-
     return updated;
   }
 
@@ -377,69 +287,95 @@ export class AdminService {
         { email: { contains: query.search, mode: 'insensitive' } },
       ];
     }
+    return this.prisma.user.findMany({ where, orderBy: { createdAt: 'desc' } });
+  }
+
+  async getPendingAdmins() {
     return this.prisma.user.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
+      where: { role: 'ADMIN', adminApproval: 'PENDING', status: 'ACTIVE' },
+      select: { id: true, name: true, email: true, createdAt: true },
     });
   }
 
-  async blockAdmin(id: number) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException('Administrador não encontrado');
-    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        status: UserStatus.BLOCKED,
-        tokenVersion: { increment: 1 },
-      },
-    });
+  async blockAdmin(id: number, currentUserRole: string) {
+    const admin = await this.prisma.user.findUnique({ where: { id } });
+    if (!admin) throw new NotFoundException('Administrador não encontrado');
+    if (admin.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+    if (currentUserRole !== 'SUPER_ADMIN') throw new ForbiddenException('Apenas Super Admin pode bloquear administradores');
+    return this.prisma.user.update({ where: { id }, data: { status: UserStatus.BLOCKED, tokenVersion: { increment: 1 } } });
   }
 
-  async activateAdmin(id: number) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException('Administrador não encontrado');
-    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        status: UserStatus.ACTIVE,
-        tokenVersion: { increment: 1 },
-      },
-    });
+  async activateAdmin(id: number, currentUserRole: string) {
+    const admin = await this.prisma.user.findUnique({ where: { id } });
+    if (!admin) throw new NotFoundException('Administrador não encontrado');
+    if (admin.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+    if (currentUserRole !== 'SUPER_ADMIN') throw new ForbiddenException('Apenas Super Admin pode ativar administradores');
+    return this.prisma.user.update({ where: { id }, data: { status: UserStatus.ACTIVE, tokenVersion: { increment: 1 } } });
   }
 
-  async resetAdminPassword(id: number) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException('Administrador não encontrado');
-    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
-
+  async resetAdminPassword(id: number, currentUserRole: string) {
+    const admin = await this.prisma.user.findUnique({ where: { id } });
+    if (!admin) throw new NotFoundException('Administrador não encontrado');
+    if (admin.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+    if (currentUserRole !== 'SUPER_ADMIN') throw new ForbiddenException('Apenas Super Admin pode resetar senha de administradores');
     const newPassword = Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await this.prisma.user.update({
-      where: { id },
-      data: {
-        password: hashedPassword,
-        tokenVersion: { increment: 1 },
-      },
-    });
-
-    if (user.email) {
-      await this.mailService.sendEmail(
-        user.email,
-        'Nova senha - MecPro Admin',
-        `Sua nova senha para acessar o painel administrativo é: ${newPassword}\n\nRecomendamos alterá-la após o primeiro acesso.`
-      ).catch(err => console.error('Erro ao enviar e-mail:', err));
-    }
-
+    await this.prisma.user.update({ where: { id }, data: { password: hashedPassword, tokenVersion: { increment: 1 } } });
+    await this.mailService.sendEmail(admin.email, 'Nova senha - MecPro Admin', `Sua nova senha para acessar o painel administrativo é: ${newPassword}\n\nRecomendamos alterá-la após o primeiro acesso.`);
     return { success: true, message: 'Senha resetada e enviada por e-mail' };
   }
 
-  async deleteAdmin(id: number) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException('Administrador não encontrado');
-    if (user.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+  async deleteAdmin(id: number, currentUserRole: string) {
+    const admin = await this.prisma.user.findUnique({ where: { id } });
+    if (!admin) throw new NotFoundException('Administrador não encontrado');
+    if (admin.role !== 'ADMIN') throw new BadRequestException('Usuário não é um administrador');
+    if (currentUserRole !== 'SUPER_ADMIN') throw new ForbiddenException('Apenas Super Admin pode remover administradores');
     await this.prisma.user.delete({ where: { id } });
+    return { success: true };
+  }
+
+  async cancelUser(userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    if (user.role !== 'OWNER') throw new BadRequestException('Apenas usuários comuns (OWNER) podem ser cancelados');
+    return this.prisma.user.update({ where: { id: userId }, data: { status: 'CANCELED', tokenVersion: { increment: 1 } } });
+  }
+
+  async resetUserPassword(userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    const newPassword = Math.random().toString(36).slice(-8);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: userId }, data: { password: hashedPassword, tokenVersion: { increment: 1 } } });
+    await this.mailService.sendEmail(user.email, 'Nova senha - MecPro', `Sua nova senha é: ${newPassword}`);
+    return { success: true, message: 'Senha resetada e enviada por e-mail' };
+  }
+
+  async cancelTenantSubscription(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { subscriptionId: true } });
+    if (!tenant || !tenant.subscriptionId) throw new BadRequestException('Nenhuma assinatura ativa encontrada');
+    const cancelled = await this.paymentService.cancelSubscription(tenant.subscriptionId);
+    if (cancelled) {
+      await this.prisma.tenant.update({ where: { id: tenantId }, data: { status: 'CANCELED', paymentStatus: 'CANCELED' } });
+      await this.prisma.subscription.updateMany({ where: { tenantId, status: 'ACTIVE' }, data: { status: 'CANCELED' } });
+    }
+    return { success: cancelled };
+  }
+
+  async getTenantTotals(tenantId: string) {
+    const [clientsCount, estimatesCount, invoicesCount, estimatesTotal, invoicesTotal] = await Promise.all([
+      this.prisma.client.count({ where: { tenantId, deletedAt: null } }),
+      this.prisma.estimate.count({ where: { tenantId, deletedAt: null } }),
+      this.prisma.invoice.count({ where: { tenantId, deletedAt: null } }),
+      this.prisma.estimate.aggregate({ where: { tenantId, deletedAt: null }, _sum: { total: true } }),
+      this.prisma.invoice.aggregate({ where: { tenantId, deletedAt: null }, _sum: { total: true } }),
+    ]);
+    return {
+      clients: clientsCount,
+      estimates: estimatesCount,
+      invoices: invoicesCount,
+      estimatesTotal: estimatesTotal._sum.total || 0,
+      invoicesTotal: invoicesTotal._sum.total || 0,
+    };
   }
 }

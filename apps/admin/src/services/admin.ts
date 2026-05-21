@@ -247,3 +247,39 @@ export const activateUser = async (id: number | string) => {
   const response = await api.put(`/admin/users/${id}/activate`);
   return response.data;
 };
+
+// ========== NOVAS FUNÇÕES (adicione ao final do arquivo admin.ts) ==========
+export const getPendingAdmins = async () => {
+  const response = await api.get('/admin/admins/pending');
+  return response.data;
+};
+
+export const approveAdmin = async (id: string) => {
+  const response = await api.post(`/auth/admin/approve/${id}`);
+  return response.data;
+};
+
+export const rejectAdmin = async (id: string, reason?: string) => {
+  const response = await api.post(`/auth/admin/reject/${id}`, { reason });
+  return response.data;
+};
+
+export const cancelUser = async (id: string) => {
+  const response = await api.post(`/admin/users/${id}/cancel`);
+  return response.data;
+};
+
+export const resetUserPassword = async (id: string) => {
+  const response = await api.post(`/admin/users/${id}/reset-password`);
+  return response.data;
+};
+
+export const cancelTenantSubscription = async (tenantId: string) => {
+  const response = await api.post(`/admin/tenants/${tenantId}/cancel-subscription`);
+  return response.data;
+};
+
+export const getTenantTotals = async (tenantId: string) => {
+  const response = await api.get(`/admin/tenants/${tenantId}/totals`);
+  return response.data;
+};

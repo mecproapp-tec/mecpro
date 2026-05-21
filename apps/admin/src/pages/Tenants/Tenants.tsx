@@ -1,7 +1,6 @@
-// apps/admin/src/pages/Tenants/Tenants.tsx
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getTenants, updateTenantStatus, deleteTenant, invalidateTenantsCache, Tenant } from '../../services/admin';
+import { getTenants, updateTenantStatus, deleteTenant, invalidateTenantsCache, Tenant, cancelTenantSubscription } from '../../services/admin';
 import { FiEye, FiTrash2 } from 'react-icons/fi';
 
 export default function Tenants() {
@@ -29,7 +28,6 @@ export default function Tenants() {
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       await updateTenantStatus(id, newStatus);
-      // Invalida o cache para garantir dados atualizados na próxima consulta
       invalidateTenantsCache({ status: statusFilter });
       await fetchTenants();
     } catch (error) {
@@ -41,11 +39,21 @@ export default function Tenants() {
     if (!confirm('Tem certeza que deseja excluir este tenant? Todos os dados relacionados serão perdidos.')) return;
     try {
       await deleteTenant(id);
-      // Invalida o cache após exclusão
       invalidateTenantsCache({ status: statusFilter });
       await fetchTenants();
     } catch (error) {
       alert('Erro ao excluir tenant');
+    }
+  };
+
+  const handleCancelSubscription = async (tenantId: string) => {
+    if (!confirm('Cancelar a assinatura Mercado Pago deste tenant? Ele perderá o acesso pago.')) return;
+    try {
+      await cancelTenantSubscription(tenantId);
+      alert('Assinatura cancelada com sucesso.');
+      fetchTenants();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Erro ao cancelar assinatura');
     }
   };
 
@@ -99,6 +107,9 @@ export default function Tenants() {
                     </Link>
                     <button onClick={() => handleDelete(tenant.id)} className="text-red-500 hover:text-red-400">
                       <FiTrash2 size={18} />
+                    </button>
+                    <button onClick={() => handleCancelSubscription(tenant.id)} className="text-red-500 hover:text-red-400 ml-2 text-xs">
+                      Cancelar MP
                     </button>
                   </div>
                 </td>

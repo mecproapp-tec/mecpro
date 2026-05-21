@@ -14,7 +14,7 @@ export class ContactService {
 
   async create(data: { userEmail?: string; userName?: string; message: string; tenantId?: string }) {
     try {
-      return await this.prisma.contactMessage.create({
+      const message = await this.prisma.contactMessage.create({
         data: {
           userEmail: data.userEmail,
           userName: data.userName,
@@ -23,6 +23,21 @@ export class ContactService {
           status: 'pending',
         },
       });
+
+      // Notificar todos os administradores (ADMIN e SUPER_ADMIN) sobre a nova mensagem
+      const admins = await this.prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
+      });
+
+      for (const admin of admins) {
+        await this.notificationsService.createForUser(
+          admin.id,
+          'Nova mensagem de contato',
+          `De: ${data.userName || data.userEmail || 'Anônimo'}\n${data.message.substring(0, 100)}${data.message.length > 100 ? '…' : ''}`,
+        );
+      }
+
+      return message;
     } catch (error) {
       this.logger.error(`Erro ao criar mensagem: ${error.message}`);
       throw error;
@@ -41,7 +56,7 @@ export class ContactService {
           reply: true,
           createdAt: true,
           updatedAt: true,
-          tenant: {                        // CORRIGIDO: Tenant -> tenant
+          tenant: {
             select: {
               id: true,
               name: true,
@@ -71,7 +86,7 @@ export class ContactService {
           reply: true,
           createdAt: true,
           updatedAt: true,
-          tenant: {                        // CORRIGIDO: Tenant -> tenant
+          tenant: {
             select: {
               id: true,
               name: true,
@@ -111,7 +126,7 @@ export class ContactService {
           reply: true,
           createdAt: true,
           updatedAt: true,
-          tenant: {                        // CORRIGIDO: Tenant -> tenant
+          tenant: {
             select: { id: true, name: true, email: true, phone: true },
           },
         },

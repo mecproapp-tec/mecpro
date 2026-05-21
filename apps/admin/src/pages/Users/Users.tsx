@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../../services/api";
+import { cancelUser, resetUserPassword } from "../../services/admin";
 
 interface User {
   id: string;
@@ -49,6 +50,26 @@ export default function Users() {
     }
   };
 
+  const handleCancelUser = async (id: string) => {
+    if (!confirm('Cancelar este usuário? Ele perderá o acesso ao sistema.')) return;
+    try {
+      await cancelUser(id);
+      setUsers(users.map(u => u.id === id ? { ...u, status: "CANCELED" } : u));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Erro ao cancelar');
+    }
+  };
+
+  const handleResetPassword = async (id: string, email: string) => {
+    if (!confirm(`Resetar senha do usuário ${email}? Uma nova senha será enviada por e-mail.`)) return;
+    try {
+      await resetUserPassword(id);
+      alert('Nova senha enviada por e-mail.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Erro ao resetar senha');
+    }
+  };
+
   if (loading) return <div className="p-6 text-center">Carregando...</div>;
   if (error) return <div className="p-6 text-center text-red-500">{error}</div>;
 
@@ -84,10 +105,14 @@ export default function Users() {
                 <td className="p-4">
                   <Link to={`/users/${user.id}`} className="text-neonBlue hover:underline mr-2">Ver</Link>
                   {user.status === "ACTIVE" ? (
-                    <button onClick={() => handleBlock(user.id)} className="text-red-500 hover:underline">Bloquear</button>
+                    <button onClick={() => handleBlock(user.id)} className="text-red-500 hover:underline mr-2">Bloquear</button>
                   ) : (
-                    <button onClick={() => handleActivate(user.id)} className="text-green-500 hover:underline">Ativar</button>
+                    <button onClick={() => handleActivate(user.id)} className="text-green-500 hover:underline mr-2">Ativar</button>
                   )}
+                  {user.status !== 'CANCELED' && (
+                    <button onClick={() => handleCancelUser(user.id)} className="text-red-500 hover:underline mr-2">Cancelar</button>
+                  )}
+                  <button onClick={() => handleResetPassword(user.id, user.email)} className="text-yellow-500 hover:underline">Reset Senha</button>
                 </td>
               </tr>
             ))}

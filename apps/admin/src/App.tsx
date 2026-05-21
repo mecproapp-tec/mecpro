@@ -16,6 +16,7 @@ import Estimates from './pages/Estimates/Estimates';
 import Invoices from './pages/Invoices/InvoicesList';
 import Layout from './components/layout/Layout';
 import ContactMessages from './pages/Contact/ContactMessages';
+import PendingAdmins from './pages/Admin/PendingAdmins';
 
 function App() {
   return (
@@ -45,6 +46,7 @@ function App() {
             <Route path="notifications" element={<Notifications />} />
             <Route path="notifications/bulk" element={<BulkNotifications />} />
             <Route path="contact-messages" element={<ContactMessages />} />
+            <Route path="pending-admins" element={<PendingAdmins />} />
           </Route>
         </Routes>
       </AuthProvider>

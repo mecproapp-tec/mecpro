@@ -1,25 +1,21 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  Res,
-  HttpCode,
-  HttpStatus,
-  Req,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Res, HttpCode, HttpStatus, Req,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { SessionGuard } from '../../auth/guards/session.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 import { TenantStatus } from '@prisma/client';
+
+interface UserPayload {
+  id: number;
+  tenantId: string;
+  role: string;
+  sessionToken: string;
+}
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, SessionGuard, RolesGuard)
@@ -89,10 +85,7 @@ export class AdminController {
 
   @Post('clients/:id/send-message')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  async sendMessageToClient(
-    @Param('id') id: string,
-    @Body() body: { subject: string; message: string }
-  ) {
+  async sendMessageToClient(@Param('id') id: string, @Body() body: { subject: string; message: string }) {
     return this.adminService.sendMessageToClient(Number(id), body);
   }
 
@@ -106,10 +99,7 @@ export class AdminController {
   @Roles('ADMIN', 'SUPER_ADMIN')
   async getEstimatePdf(@Param('id') id: string, @Res() res: Response) {
     const pdfBuffer = await this.adminService.getEstimatePdf(Number(id));
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename=orcamento-${id}.pdf`,
-    });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename=orcamento-${id}.pdf` });
     res.send(pdfBuffer);
   }
 
@@ -123,10 +113,7 @@ export class AdminController {
   @Roles('ADMIN', 'SUPER_ADMIN')
   async getInvoicePdf(@Param('id') id: string, @Res() res: Response) {
     const pdfBuffer = await this.adminService.getInvoicePdf(Number(id));
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename=fatura-${id}.pdf`,
-    });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename=fatura-${id}.pdf` });
     res.send(pdfBuffer);
   }
 
@@ -146,6 +133,30 @@ export class AdminController {
   @Roles('ADMIN', 'SUPER_ADMIN')
   async activateUser(@Param('id') id: string) {
     return this.adminService.activateUser(Number(id));
+  }
+
+  @Post('users/:id/cancel')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async cancelUser(@Param('id') id: string) {
+    return this.adminService.cancelUser(Number(id));
+  }
+
+  @Post('users/:id/reset-password')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async resetUserPassword(@Param('id') id: string) {
+    return this.adminService.resetUserPassword(Number(id));
+  }
+
+  @Post('tenants/:id/cancel-subscription')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async cancelTenantSubscription(@Param('id') id: string) {
+    return this.adminService.cancelTenantSubscription(id);
+  }
+
+  @Get('tenants/:id/totals')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async getTenantTotals(@Param('id') id: string) {
+    return this.adminService.getTenantTotals(id);
   }
 
   @Post('notifications/send')
@@ -193,10 +204,7 @@ export class AdminController {
 
   @Put('contact/:id/reply')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  async replyToContactMessage(
-    @Param('id') id: string,
-    @Body() body: { reply: string }
-  ) {
+  async replyToContactMessage(@Param('id') id: string, @Body() body: { reply: string }) {
     return this.adminService.replyToContactMessage(Number(id), body.reply);
   }
 
@@ -213,28 +221,34 @@ export class AdminController {
     return this.adminService.getAdmins(query);
   }
 
+  @Get('admins/pending')
+  @Roles('SUPER_ADMIN')
+  async getPendingAdmins() {
+    return this.adminService.getPendingAdmins();
+  }
+
   @Put('admins/:id/block')
   @Roles('SUPER_ADMIN')
-  async blockAdmin(@Param('id') id: string) {
-    return this.adminService.blockAdmin(Number(id));
+  async blockAdmin(@Param('id') id: string, @CurrentUser() user: UserPayload) {
+    return this.adminService.blockAdmin(Number(id), user.role);
   }
 
   @Put('admins/:id/activate')
   @Roles('SUPER_ADMIN')
-  async activateAdmin(@Param('id') id: string) {
-    return this.adminService.activateAdmin(Number(id));
+  async activateAdmin(@Param('id') id: string, @CurrentUser() user: UserPayload) {
+    return this.adminService.activateAdmin(Number(id), user.role);
   }
 
   @Post('admins/:id/reset-password')
   @Roles('SUPER_ADMIN')
-  async resetAdminPassword(@Param('id') id: string) {
-    return this.adminService.resetAdminPassword(Number(id));
+  async resetAdminPassword(@Param('id') id: string, @CurrentUser() user: UserPayload) {
+    return this.adminService.resetAdminPassword(Number(id), user.role);
   }
 
   @Delete('admins/:id')
   @Roles('SUPER_ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteAdmin(@Param('id') id: string) {
-    await this.adminService.deleteAdmin(Number(id));
+  async deleteAdmin(@Param('id') id: string, @CurrentUser() user: UserPayload) {
+    await this.adminService.deleteAdmin(Number(id), user.role);
   }
 }

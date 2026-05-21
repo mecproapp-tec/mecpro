@@ -2,13 +2,13 @@ import { Outlet, Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { 
   FiMenu, FiUsers, FiHome, FiLogOut, FiBell, 
-  FiFileText, FiDollarSign, FiUser, FiMail 
+  FiFileText, FiDollarSign, FiUser, FiMail, FiUserPlus
 } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { logout } = useAuth();
+  const { logout, admin } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -88,6 +88,15 @@ export default function Layout() {
             <FiMail size={20} />
             {sidebarOpen && <span>Mensagens de Contato</span>}
           </Link>
+          {admin?.role === 'SUPER_ADMIN' && (
+            <Link
+              to="/pending-admins"
+              className="flex items-center gap-3 p-3 rounded hover:bg-gray800 text-gray-300 hover:text-neonBlue transition"
+            >
+              <FiUserPlus size={20} />
+              {sidebarOpen && <span>Aprovar Admins</span>}
+            </Link>
+          )}
         </nav>
         <div className="p-4 border-t border-gray800">
           <button

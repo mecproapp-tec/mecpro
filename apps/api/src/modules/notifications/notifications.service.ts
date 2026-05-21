@@ -69,6 +69,22 @@ export class NotificationsService {
     return notification;
   }
 
+  async createForUser(userId: number, title: string, message: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { tenantId: true },
+    });
+    if (!user) return null;
+    return this.prisma.notification.create({
+      data: {
+        tenantId: user.tenantId,
+        title,
+        message,
+        isGlobal: false,
+      },
+    });
+  }
+
   async createForAppointment(appointmentId: number, tenantId: string, title: string, message: string) {
     const existing = await this.prisma.notification.findFirst({
       where: { appointmentId, tenantId },
@@ -77,7 +93,6 @@ export class NotificationsService {
     return this.create(tenantId, title, message, appointmentId);
   }
 
-  // 🔥 NOVO MÉTODO: excluir uma notificação
   async delete(id: number, tenantId: string) {
     const notification = await this.prisma.notification.findFirst({
       where: { id, tenantId },
@@ -90,7 +105,6 @@ export class NotificationsService {
     return { success: true };
   }
 
-  
   async deleteAllRead(tenantId: string) {
     const result = await this.prisma.notification.deleteMany({
       where: { tenantId, read: true },
