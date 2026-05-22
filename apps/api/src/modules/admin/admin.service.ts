@@ -20,15 +20,18 @@ export class AdminService {
   ) {}
 
   async getDashboard() {
+    // Exclui o tenant administrativo de todas as contagens
+    const adminTenantId = '00000000-0000-0000-0000-000000000001';
     const [totalTenants, activeTenants, blockedTenants, totalClients, totalEstimates, totalInvoices, recentTenants] =
       await Promise.all([
-        this.prisma.tenant.count(),
-        this.prisma.tenant.count({ where: { status: TenantStatus.ACTIVE } }),
-        this.prisma.tenant.count({ where: { status: TenantStatus.BLOCKED } }),
+        this.prisma.tenant.count({ where: { id: { not: adminTenantId } } }),
+        this.prisma.tenant.count({ where: { status: TenantStatus.ACTIVE, id: { not: adminTenantId } } }),
+        this.prisma.tenant.count({ where: { status: TenantStatus.BLOCKED, id: { not: adminTenantId } } }),
         this.prisma.client.count(),
         this.prisma.estimate.count(),
         this.prisma.invoice.count(),
         this.prisma.tenant.findMany({
+          where: { id: { not: adminTenantId } },
           take: 10,
           orderBy: { createdAt: 'desc' },
           select: { id: true, name: true, email: true, createdAt: true, status: true },
@@ -38,7 +41,10 @@ export class AdminService {
   }
 
   async getTenants(query: { status?: string; search?: string }) {
-    const where: any = {};
+    const adminTenantId = '00000000-0000-0000-0000-000000000001';
+    const where: any = {
+      id: { not: adminTenantId },
+    };
     if (query.status) where.status = query.status;
     if (query.search) {
       where.OR = [
@@ -184,7 +190,6 @@ export class AdminService {
     return this.pdfService.generateInvoicePdf(invoice);
   }
 
-  // 🔥 MÉTODO ALTERADO: agora recebe userRole e filtra SUPER_ADMIN para ADMIN
   async getAllUsers(userRole: string, query: { search?: string; role?: string }) {
     const where: any = {};
     if (query.search) {
@@ -194,7 +199,6 @@ export class AdminService {
       ];
     }
     if (query.role) where.role = query.role;
-    // ADMIN não pode ver SUPER_ADMIN
     if (userRole === 'ADMIN') {
       where.role = { not: 'SUPER_ADMIN' };
     }
