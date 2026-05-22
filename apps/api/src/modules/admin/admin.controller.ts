@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Res, HttpCode, HttpStatus, Req,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Res, HttpCode, HttpStatus, Req, Logger, BadRequestException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -20,6 +20,8 @@ interface UserPayload {
 @Controller('admin')
 @UseGuards(JwtAuthGuard, SessionGuard, RolesGuard)
 export class AdminController {
+  private readonly logger = new Logger(AdminController.name);
+
   constructor(private readonly adminService: AdminService) {}
 
   @Get('dashboard')
@@ -162,6 +164,13 @@ export class AdminController {
   @Post('notifications/send')
   @Roles('ADMIN', 'SUPER_ADMIN')
   async sendNotification(@Body() body: any) {
+    this.logger.log(`📨 Recebida solicitação de notificação: target=${body.target}, title=${body.title}`);
+    if (!body.title || !body.message) {
+      throw new BadRequestException('Título e mensagem são obrigatórios');
+    }
+    if (body.target === 'specific' && (!body.tenantIds || body.tenantIds.length === 0)) {
+      throw new BadRequestException('Para envio específico, informe pelo menos um tenantId');
+    }
     return this.adminService.sendNotification(body);
   }
 
