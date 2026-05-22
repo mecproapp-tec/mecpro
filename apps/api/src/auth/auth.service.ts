@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -207,12 +207,21 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Credenciais inválidas');
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('Credenciais inválidas');
-    if (!user.tenantId) throw new UnauthorizedException('Usuário sem tenant');
-    if (user.status === 'BLOCKED') throw new UnauthorizedException('Usuário bloqueado. Contate o suporte.');
-    if (!user.tenant || user.tenant.status !== 'ACTIVE') {
-      this.logger.warn(`Tentativa de login para tenant bloqueado/cancelado: ${email}`);
-      throw new UnauthorizedException('Sua conta da oficina foi bloqueada ou cancelada.');
+    
+    // SUPER_ADMIN pode ter tenantId null
+    if (user.role !== 'SUPER_ADMIN' && !user.tenantId) {
+      throw new UnauthorizedException('Usuário sem tenant');
     }
+    if (user.status === 'BLOCKED') throw new UnauthorizedException('Usuário bloqueado. Contate o suporte.');
+    
+    // Se não for SUPER_ADMIN, verifica tenant ativo
+    if (user.role !== 'SUPER_ADMIN') {
+      if (!user.tenant || user.tenant.status !== 'ACTIVE') {
+        this.logger.warn(`Tentativa de login para tenant bloqueado/cancelado: ${email}`);
+        throw new UnauthorizedException('Sua conta da oficina foi bloqueada ou cancelada.');
+      }
+    }
+    
     if (user.role === 'ADMIN' && user.adminApproval !== 'APPROVED') {
       throw new UnauthorizedException('Seu cadastro aguarda aprovação do Super Admin.');
     }
@@ -254,7 +263,9 @@ export class AuthService {
     const session = await this.prisma.userSession.findFirst({ where: { userId: user.id, sessionToken } });
     if (!session) throw new UnauthorizedException('Sessão não encontrada');
     if (user.status !== 'ACTIVE') throw new UnauthorizedException('Usuário bloqueado');
-    if (!user.tenant || user.tenant.status !== 'ACTIVE') throw new UnauthorizedException('Sua conta da oficina foi bloqueada ou cancelada');
+    if (user.role !== 'SUPER_ADMIN' && (!user.tenant || user.tenant.status !== 'ACTIVE')) {
+      throw new UnauthorizedException('Sua conta da oficina foi bloqueada ou cancelada');
+    }
     const payload = { sub: user.id, email: user.email, tenantId: user.tenantId, role: user.role, sessionToken };
     const accessToken = this.jwtService.sign(payload);
     return { accessToken };

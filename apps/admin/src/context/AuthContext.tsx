@@ -12,7 +12,7 @@ interface AdminUser {
 interface AuthContextType {
   admin: AdminUser | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -26,27 +26,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('adminToken');
     const storedAdmin = localStorage.getItem('admin');
     if (token && storedAdmin) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setAdmin(JSON.parse(storedAdmin));
     }
     setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      const { accessToken, user } = response.data;
-      localStorage.setItem('adminToken', accessToken);
-      localStorage.setItem('admin', JSON.stringify(user));
-      setAdmin(user);
-    } catch (error) {
-      console.error('Erro no login:', error);
-      throw new Error('Credenciais inválidas');
-    }
+    const response = await api.post('/auth/login', { email, password });
+    const { accessToken, refreshToken, user } = response.data;
+    localStorage.setItem('adminToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('admin', JSON.stringify(user));
+    api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+    setAdmin(user);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Erro no logout:', error);
+    }
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('admin');
+    delete api.defaults.headers.common['Authorization'];
     setAdmin(null);
   };
 

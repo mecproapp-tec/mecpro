@@ -119,8 +119,8 @@ export class AdminController {
 
   @Get('users')
   @Roles('ADMIN', 'SUPER_ADMIN')
-  async getAllUsers(@Query() query: any) {
-    return this.adminService.getAllUsers(query);
+  async getAllUsers(@CurrentUser() user: UserPayload, @Query() query: any) {
+    return this.adminService.getAllUsers(user.role, query);
   }
 
   @Put('users/:id/block')

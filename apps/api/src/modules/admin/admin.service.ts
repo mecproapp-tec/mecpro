@@ -184,7 +184,8 @@ export class AdminService {
     return this.pdfService.generateInvoicePdf(invoice);
   }
 
-  async getAllUsers(query: { search?: string; role?: string }) {
+  // 🔥 MÉTODO ALTERADO: agora recebe userRole e filtra SUPER_ADMIN para ADMIN
+  async getAllUsers(userRole: string, query: { search?: string; role?: string }) {
     const where: any = {};
     if (query.search) {
       where.OR = [
@@ -193,7 +194,15 @@ export class AdminService {
       ];
     }
     if (query.role) where.role = query.role;
-    return this.prisma.user.findMany({ where, orderBy: { createdAt: 'desc' } });
+    // ADMIN não pode ver SUPER_ADMIN
+    if (userRole === 'ADMIN') {
+      where.role = { not: 'SUPER_ADMIN' };
+    }
+    return this.prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, email: true, role: true, status: true, createdAt: true },
+    });
   }
 
   async blockUser(id: number) {
